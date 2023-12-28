@@ -1,0 +1,7 @@
+__pycache__/
+.venv/
+resources/
+data/
+tests/
+__init__.py
+scratch.py
