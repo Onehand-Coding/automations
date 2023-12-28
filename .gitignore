@@ -1,7 +1,12 @@
+# My default ignored files.
+.sublime-project-files/
 __pycache__/
 .venv/
-resources/
-data/
-tests/
+__main__.py
 __init__.py
 scratch.py
+
+# project ignored.
+resources/
+tests/
+data/
