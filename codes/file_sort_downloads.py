@@ -1,5 +1,6 @@
 from pathlib import Path
 from file_organizer import agressive_sort, simple_sort
+from helper import choose
 
 DOWNLOADS = Path('~/Downloads').expanduser()
 
@@ -10,11 +11,7 @@ def main():
         'simple': simple_sort,
         'agressive': agressive_sort,
     }
-    print(*list(sort_methods.keys()), sep=' or ', end='?\n')
-    sort_method = None
-    while sort_method not in sort_methods:
-        sort_method = input('> ').strip().lower()
-    sort_methods.get(sort_method)(DOWNLOADS)
+    sort_methods[choose(list(sort_methods.keys()))](DOWNLOADS)
 
 
 if __name__ == '__main__':

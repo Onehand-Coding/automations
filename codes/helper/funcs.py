@@ -42,3 +42,22 @@ def get_folder_path(task):
             print('Enter a valid path!')
             continue
         return Path(path).absolute()
+
+
+def choose(choices):
+    if not isinstance(choices, list):
+        raise ValueError(f'Can only use {list().__class__.__name__} as choices container!')
+    if not choices or len(choices) <= 1:
+        raise ValueError('Argument choices must be more than one!')
+
+    if len(choices) == 2:
+        print(*choices, sep=' or ', end='?\n')
+        choice = None
+        while choice not in choices:
+            choice = input('> ')
+        return choices[choices.index(choice)]
+    else:
+        print('Choose item index.')
+        for index, item in enumerate(choices, start=1):
+            print(index, item)
+        return choices[get_index(choices)]
