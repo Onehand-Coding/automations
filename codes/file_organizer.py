@@ -127,7 +127,7 @@ def agressive_sort(to_sort_path):
 
 
 def main():
-    to_sort_dir = get_folder_path(task="of folder you want to organize files from")
+    to_sort_dir = get_folder_path(task="folder you want to organize files from")
 
     if confirm("Simple sort?", confirm_letter="yes"):
         simple_sort(to_sort_dir)

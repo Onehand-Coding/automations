@@ -67,9 +67,9 @@ def move_files(files_to_move, destination, filetype):
 
 
 def main():
-    source = get_folder_path('of folder you want to move files from')
+    source = get_folder_path('folder you want to move files from')
     filetype = get_file_type()
-    destination = get_folder_path(f'of folder you want to move {filetype} files to')
+    destination = get_folder_path(f'folder you want to move {filetype} files to')
 
     try:
         move_files(get_files_to_move(source, destination, filetype), destination, filetype)

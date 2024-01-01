@@ -51,9 +51,9 @@ def copy_files(source, destination, filetype):
 
 
 def main():
-    source = get_folder_path('of folder you want to copy files from')
+    source = get_folder_path('folder you want to copy files from')
     filetype = get_file_type()
-    destination = get_folder_path(f'of folder you want to copy {filetype} files to')
+    destination = get_folder_path(f'folder you want to copy {filetype} files to')
 
     try:
         copy_files(source, destination, filetype)
