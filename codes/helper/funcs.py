@@ -1,6 +1,7 @@
 # Helper functions for my scripts
-from datetime import datetime
+import csv
 from pathlib import Path
+from datetime import datetime
 
 
 def confirm(question, /, *, choice="(Y/n)", confirm_letter='y'):
@@ -75,3 +76,23 @@ def choose(choices):
         for index, item in enumerate(choices, start=1):
             print(index, item)
         return choices[get_index(choices)]
+
+
+def read_csv_dict_output(csv_file, *, delimiter=','):
+    with open(csv_file, 'r', encoding='utf-8') as f:
+        csv_reader = csv.DictReader(f, delimiter=delimiter)
+        for data in csv_reader:
+            for key in data:
+                print(f'{key}: {data.get(key)}')
+            print()
+
+
+def read_csv_list_output(csv_file, *, delimiter=','):
+    with open(csv_file, 'r', encoding='utf-8') as f:
+        csv_reader = csv.reader(f, delimiter=delimiter)
+        headers = next(csv_reader)
+        print()
+        print(*headers)
+        print()
+        for data in csv_reader:
+            print(*data)
