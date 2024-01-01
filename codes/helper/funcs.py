@@ -60,7 +60,7 @@ def get_folder_path(task):
             return Path(path).absolute()
 
 
-def choose(choices):
+def choose(choices, task=''):
     """Prompt the user to choose an item from a list."""
     if not isinstance(choices, list) or len(choices) <= 1:
         raise ValueError('Choices must be a list with more than one element.')
@@ -72,7 +72,7 @@ def choose(choices):
             choice = input('> ')
         return choices[choices.index(choice)]
     else:
-        print('Choose item index.')
+        print(f'Choose {task} index')
         for index, item in enumerate(choices, start=1):
             print(index, item)
         return choices[get_index(choices)]
