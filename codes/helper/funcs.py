@@ -72,7 +72,8 @@ def choose(choices, task=''):
             choice = input('> ')
         return choices[choices.index(choice)]
     else:
-        print(f'Choose {task} index')
+        letter = 'an' if task[0] in 'aeiou' else 'a'
+        print(f'Choose {letter} {task}')
         for index, item in enumerate(choices, start=1):
             print(index, item)
         return choices[get_index(choices)]
