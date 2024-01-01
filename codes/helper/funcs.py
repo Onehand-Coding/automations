@@ -4,26 +4,40 @@ from pathlib import Path
 
 
 def confirm(question, /, *, choice="(Y/n)", confirm_letter='y'):
+    """Prompt user for confirmation."""
     return input(f"{question} {choice} ").lower().strip().startswith(confirm_letter)
 
 
-def get_str_datetime(template='%B %d, %Y  %I:%M %p'):
-    return datetime.now().strftime(template)
+def get_str_datetime(date_format='%B %d, %Y  %I:%M %p'):
+    """Get the current date and time as a formatted string."""
+    return datetime.now().strftime(date_format)
+
+
+def get_valid_num():
+    """Get valid integer input from user."""
+    valid_num = ''
+    while not valid_num:
+        try:
+            valid_num = int(input('> '))
+        except ValueError:
+            print('Enter an integer!')
+
+    return valid_num
 
 
 def get_index(list_of_data):
+    """Get a valid index from the user."""
     length = len(list_of_data)
     while True:
-        try:
-            index = int(input("> ").strip())
-            if 1 <= index <= length:
-                return index - 1
-
-        except ValueError:
-            continue
+        index = get_valid_num()
+        if 1 <= index <= length:
+            return index - 1
+        else:
+            print(f"Index should be between 1 and {length}. Try again.")
 
 
 def new_filepath(file, *, parent=None, add_prefix='', start_count=1):
+    """Generate a new filepath to avoid duplicates."""
     base_path = Path(parent).absolute() / file if parent else file
     new_path = base_path.parent / f'{base_path.stem}{add_prefix}({start_count}){base_path.suffix}'
 
@@ -35,20 +49,20 @@ def new_filepath(file, *, parent=None, add_prefix='', start_count=1):
 
 
 def get_folder_path(task):
-    print(f'Enter the absolute path {task}')
+    """Prompt the user to enter a valid folder path."""
+    print(f'Enter the absolute path for {task}')
     while True:
         path = input('> ')
         if not path or not Path(path).exists():
-            print('Enter a valid path!')
-            continue
-        return Path(path).absolute()
+            print('Invalid path. Please enter a valid path!')
+        else:
+            return Path(path).absolute()
 
 
 def choose(choices):
-    if not isinstance(choices, list):
-        raise ValueError(f'Can only use {list().__class__.__name__} as choices container!')
-    if not choices or len(choices) <= 1:
-        raise ValueError('Argument choices must be more than one!')
+    """Prompt the user to choose an item from a list."""
+    if not isinstance(choices, list) or len(choices) <= 1:
+        raise ValueError('Choices must be a list with more than one element.')
 
     if len(choices) == 2:
         print(*choices, sep=' or ', end='?\n')
