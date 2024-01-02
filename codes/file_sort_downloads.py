@@ -3,15 +3,18 @@ from file_organizer import agressive_sort, simple_sort
 from helper import choose
 
 DOWNLOADS = Path('~/Downloads').expanduser()
+TO_EXCLUDE = ['Torrent Downloads']
 
 
 def main():
     print('Sort Downloads')
     sort_methods = {
-        'simple': simple_sort,
-        'agressive': agressive_sort,
+        'simple': lambda: simple_sort(DOWNLOADS),
+        'agressive': lambda: agressive_sort(DOWNLOADS, TO_EXCLUDE),
     }
-    sort_methods[choose(list(sort_methods.keys()))](DOWNLOADS)
+    choices = list(sort_methods.keys())
+    function = sort_methods[choose(choices)]
+    function()
 
 
 if __name__ == '__main__':

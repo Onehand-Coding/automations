@@ -78,12 +78,12 @@ def simple_sort(to_sort_path):
     print("Simple sort Done!")
 
 
-def verify_removed(old_files, new_files, file_type):
-    removed_files = set(old_files) - new_files
+def verify_removed(unsorted_files, sorted_files):
+    removed_files = set(unsorted_files) - sorted_files
     if removed_files:
-        print(f"Some {file_type} are Removed!")
+        print(f"Some files are Removed!")
         for file in removed_files:
-            print(file.name, end=', ')
+            print(file.name)
 
 
 def remove_folders(folders):
@@ -102,8 +102,17 @@ def remove_folders(folders):
                 shutil.rmtree(folder, onerror=remove_readonly)
 
 
-def agressive_sort(to_sort_path):
-    unsorted_files = {file for file in to_sort_path.rglob("*") if file.is_file()}
+def should_exclude(file, to_exclude_files):
+    return any(to_exclude in file.parts for to_exclude in to_exclude_files)
+
+
+def agressive_sort(to_sort_path, to_exclude_files=None):
+    if to_exclude_files is None:
+        to_exclude_files = []
+    unsorted_files = {
+        file for file in to_sort_path.rglob("*")
+        if file.is_file() and not should_exclude(file, to_exclude_files)
+    }
     mapped_files = map_files(unsorted_files, to_sort_path)
     default_folders = set()
 
@@ -113,17 +122,22 @@ def agressive_sort(to_sort_path):
         move_file(file, ext_dest)
         default_folders.update({type_dest, ext_dest})
 
-    all_folders = {file for file in to_sort_path.rglob("*/")}
+    all_folders = {
+        folder for folder in to_sort_path.rglob("*/")
+        if not should_exclude(folder, to_exclude_files)
+    }
     empty_folders = all_folders - default_folders
     remove_folders(empty_folders)
 
     for folder in all_folders:
         prefix_sort(folder)
 
-    sorted_files = {file for file in to_sort_path.rglob("*") if file.is_file()}
+    sorted_files = {
+        file for file in to_sort_path.rglob("*")
+        if file.is_file() and not should_exclude(file, to_exclude_files)
+    }
     is_ok = len(sorted_files) == len(unsorted_files)
-
-    print("Agressive sort successfully Done!" if is_ok else verify_removed(unsorted_files, sorted_files, 'files'))
+    print("Agressive sort successful!" if is_ok else verify_removed(unsorted_files, sorted_files))
 
 
 def main():
