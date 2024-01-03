@@ -80,10 +80,27 @@ def choose(choices, task=''):
         return choices[get_index(choices)]
 
 
+def write_to_json(json_file, json_key, json_data, indent=4):
+    with open(json_file, "w") as f:
+        json.dump({json_key: json_data}, f, indent=indent)
+
+
 def read_print_json(jsonFile):
     with open(jsonFile, 'r') as f:
         data = json.load(f)
     print(json.dumps(data, indent=4))
+
+
+def csv_dict_writer(filename, data, *, delimiter=",", fieldnames=None):
+    if fieldnames is None:
+        raise TypeError("Missing required keyword argument fieldnames.")
+
+    with open(filename, "w", newline="") as f:
+        csv_writer = csv.DictWriter(f, delimiter=delimiter, fieldnames=fieldnames)
+
+        csv_writer.writeheader()
+        for csv_data in data:
+            csv_writer.writerow(csv_data)
 
 
 def read_csv_dict_output(csv_file, *, delimiter=','):

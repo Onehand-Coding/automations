@@ -1,8 +1,7 @@
 import re
-import csv
-import json
 import subprocess
 from pathlib import Path
+from helper import write_to_json, read_print_json
 
 
 def getSSIDS():
@@ -43,32 +42,18 @@ def getPasswords(ssids):
     return wifiList
 
 
-def writeToCsv(scriptDir, wifiData):
-    print(f"Writing wifi data to csv file...")
-    with open(scriptDir / "wifi_password.csv", "w", newline="") as f:
-        fields = ["SSID", "Password"]
-        csvWriter = csv.DictWriter(f, delimiter=",", fieldnames=fields)
-        csvWriter.writeheader()
-
-        for data in wifiData:
-            csvWriter.writerow(data)
-
-
-def writeToJson(scriptDir, wifiData):
-    print(f"Writing wifi data to json file...")
-    with open(scriptDir / "wifi_password.json", "w") as f:
-        data = {"wifi passwords": wifiData}
-        json.dump(data, f, indent=4)
-
-
 def main():
     scriptsDataFolder = Path("~/.my scripts data").expanduser()
     if not scriptsDataFolder.exists():
         scriptsDataFolder.mkdir()
 
     myWifiData = getPasswords(getSSIDS())
-    writeToCsv(scriptsDataFolder, myWifiData)
-    writeToJson(scriptsDataFolder, myWifiData)
+    wifiDataFile = scriptsDataFolder / "wifi_password.json"
+    wifiDataKey = "wifi passwords"
+
+    print(f"Writing wifi data to json file...")
+    write_to_json(wifiDataFile, wifiDataKey, myWifiData)
+    read_print_json(wifiDataFile)
     print('Done!')
 
 
