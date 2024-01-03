@@ -1,4 +1,5 @@
 # Helper functions for my scripts
+import json
 import csv
 from pathlib import Path
 from datetime import datetime
@@ -77,6 +78,12 @@ def choose(choices, task=''):
         for index, item in enumerate(choices, start=1):
             print(index, item)
         return choices[get_index(choices)]
+
+
+def read_print_json(jsonFile):
+    with open(jsonFile, 'r') as f:
+        data = json.load(f)
+    print(json.dumps(data, indent=4))
 
 
 def read_csv_dict_output(csv_file, *, delimiter=','):
