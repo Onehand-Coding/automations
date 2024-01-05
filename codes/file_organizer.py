@@ -144,8 +144,8 @@ def stem_sort(to_sort_path):
             if len(files) > 1:
                 for file in files:
                     if prefix not in file.parts:
-                        prefix_folder = file.parent / prefix
-                        move_file(file, prefix_folder)
+                        stem_folder = file.parent / prefix
+                        move_file(file, stem_folder)
 
 
 def prefix_sort(to_sort_path):
