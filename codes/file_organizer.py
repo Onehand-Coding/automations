@@ -1,8 +1,8 @@
 import re
 import shutil
 from enum import Enum
-from itertools import combinations
 from collections import defaultdict
+from itertools import combinations, zip_longest
 
 from send2trash import send2trash
 
@@ -55,15 +55,15 @@ def move_file(file, dest):
 
 
 def verify_files(unsorted_files, sorted_files, method='Agressive'):
-    is_ok = len(sorted_files) == len(unsorted_files)
+    is_ok = len(unsorted_files) == len(sorted_files)
     if is_ok:
         print(f"{method} sort successful!")
     else:
-        removed_files = set(unsorted_files) - sorted_files
+        removed_files = set(unsorted_files) - set(sorted_files)
         if removed_files:
             print(f"Some files are Removed!")
             for file in removed_files:
-                print(file.name)
+                print(file)
 
 
 def remove_folders(folders):
@@ -83,6 +83,10 @@ def clean_stem(to_replace_pattern, stem, replacement=''):
     return re.sub(to_replace_pattern, replacement, stem).strip()
 
 
+def get_split_stem(split_pattern, to_replace_pattern, stem):
+    return split_stem(split_pattern, clean_stem(to_replace_pattern, stem))
+
+
 def get_all_folders(to_sort_path, to_exclude_files):
     return {
         folder for folder in to_sort_path.rglob("*/")
@@ -97,55 +101,41 @@ def get_all_files(to_sort_path, to_exclude_files):
     }
 
 
-def get_common_prefixes(files):
-    split_file_stems = [split_stem(SPLIT_PATTERN, clean_stem(TO_REPLACE_PATTERN, file.stem)) for file in files]
+def get_common_stems(files):
+    file_stems = [get_split_stem(SPLIT_PATTERN, TO_REPLACE_PATTERN, file.stem) for file in files]
 
-    common_prefixes = []
-    for x_combination, y_combination in combinations(split_file_stems, 2):
-        common_prefix = []
-        for i in range(len(x_combination)):
-            first_word = x_combination[0]
-            try:
-                if x_combination[i] == y_combination[i]:
-                    common_prefix.append(x_combination[i])
-            except IndexError:
-                pass
-        try:
-            common_prefix = common_prefix[:common_prefix.index(first_word, 1)]
-        except (ValueError, IndexError):
-            pass
-        common_prefixes.append(tuple(common_prefix))
+    common_stems = []
+    for x_combination, y_combination in combinations(file_stems, 2):
+        common_stem = []
+        for x_stem, y_stem in zip_longest(x_combination, y_combination, fillvalue='fill in'):
+            if x_stem == y_stem:
+                common_stem.append(x_stem)
+        common_stems.append(tuple(common_stem))
+    common_stems = list(set(common_stems))
 
-    common_prefixes = list(set(common_prefixes))
-    common_prefixes = [
-        list(common_prefix)
-        for common_prefix in common_prefixes
-        if common_prefix and len(set(prefix.lower() for prefix in common_prefix)) > 1
-    ]
-    return common_prefixes
+    return common_stems
 
 
 def stem_sort(to_sort_path):
     unsorted_files = [file for file in to_sort_path.glob("*") if file.is_file()]
-    common_prefixes = get_common_prefixes(unsorted_files)
+    common_stems = get_common_stems(unsorted_files)
 
-    prefix_folders = defaultdict(list)
+    stem_folders = defaultdict(list)
     for file in unsorted_files:
-        split_file_stem = split_stem(SPLIT_PATTERN, clean_stem(TO_REPLACE_PATTERN, file.stem))
-        for common_prefix in common_prefixes:
+        file_stem = get_split_stem(SPLIT_PATTERN, TO_REPLACE_PATTERN, file.stem)
+        for common_stem in common_stems:
             try:
-                if (all(common_prefix[i] == split_file_stem[i] for i in range(len(common_prefix)))):
-                    prefix_folders[' '.join(common_prefix)].append(file)
+                if all(common_stem[i] == file_stem[i] for i in range(len(common_stem))):
+                    stem_folders[' '.join(common_stem)].append(file)
             except IndexError:
                 pass
 
-    if len(prefix_folders.keys()) > 1:
-        for prefix, files in prefix_folders.items():
-            if len(files) > 1:
-                for file in files:
-                    if prefix not in file.parts:
-                        stem_folder = file.parent / prefix
-                        move_file(file, stem_folder)
+    for common_stem, files in stem_folders.items():
+        if len(files) > 1:
+            for file in files:
+                if common_stem not in file.parts:
+                    stem_folder = file.parent / common_stem
+                    move_file(file, stem_folder)
 
 
 def prefix_sort(to_sort_path):
@@ -153,7 +143,7 @@ def prefix_sort(to_sort_path):
     prefix_folders = defaultdict(list)
 
     for file in unsorted_files:
-        prefix = split_stem(SPLIT_PATTERN, clean_stem(TO_REPLACE_PATTERN, file.stem))[0]
+        prefix = get_split_stem(SPLIT_PATTERN, TO_REPLACE_PATTERN, file.stem)[0]
         prefix_folders[prefix].append(file)
 
     if len(prefix_folders.keys()) > 1:
