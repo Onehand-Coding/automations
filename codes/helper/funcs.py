@@ -1,6 +1,7 @@
 # Helper functions for my scripts
-import json
 import csv
+import json
+import logging
 from pathlib import Path
 from datetime import datetime
 
@@ -121,3 +122,18 @@ def read_csv_list_output(csv_file, *, delimiter=','):
         print()
         for data in csv_reader:
             print(*data)
+
+
+def configure_logging(
+        *,
+        log_level=logging.DEBUG,
+        log_file=None,
+        log_format="%(asctime)s - %(levelname)s - %(message)s"
+):
+    log_handlers = [logging.StreamHandler() if log_file is None else logging.FileHandler(log_file)]
+
+    logging.basicConfig(
+        level=log_level,
+        handlers=log_handlers,
+        format=log_format,
+    )
