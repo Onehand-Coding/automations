@@ -140,7 +140,21 @@ class FileOrganizer:
                                 pass  # A file mapped for the shortest common stem might be moved inside a folder
                                 # with longer common stem.
 
-    def run(self):
+    def simple_sort(self):
+        unsorted_files = self.get_files(self.to_sort_path)
+        existing_folders = set(self.to_sort_path.glob('*/'))
+
+        for file in unsorted_files:
+            ext_dest = file.parent.joinpath(file.suffix.strip(".") + " files" if file.suffix else " unknown files")
+            self.move_file(file, ext_dest)
+
+        new_folders = set(self.to_sort_path.glob('*/')) - existing_folders
+        for folder in new_folders:
+            self.prefix_sort(folder)
+
+        logging.info("Simple sort Done!")
+
+    def recursive_sort(self):
         unsorted_files = self.get_files()
         logging.info('Running type_sort...')
         self.type_sort()
@@ -207,9 +221,15 @@ def get_common_stems(files):
 
 
 def main():
-    to_sort_path = Path('C:/Users/KENNETH/Desktop/Test Folder')
+    to_sort_path = get_folder_path(task="folder you want to organize files from")
     orgnizer = FileOrganizer(to_sort_path)
-    orgnizer.run()
+
+    if confirm("Simple sort?", confirm_letter="yes"):
+        print(f'Organizing files in {to_sort_path.name} ...')
+        orgnizer.simple_sort()
+    elif confirm("Aggressive sort?", confirm_letter="yes"):
+        print(f'Organizing files in {to_sort_path.name} ...')
+        orgnizer.recursive_sort()
 
 
 if __name__ == "__main__":
