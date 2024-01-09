@@ -1,12 +1,16 @@
 import re
 import shutil
+import logging
 from enum import Enum
+from pathlib import Path
 from collections import defaultdict
 from itertools import combinations, zip_longest
 
 from send2trash import send2trash
 
-from helper import get_folder_path, new_filepath, confirm
+from helper import get_folder_path, new_filepath, confirm, configure_logging
+
+LOG_FILE = Path(__file__).parents[1] / 'logs' / 'file_organizer_logs.txt'
 
 TO_REPLACE_PATTERN = re.compile(r'\[.*\]|\(.*\)')
 SPLIT_PATTERN = re.compile(r'\s+|[.,:_-]')
@@ -14,65 +18,152 @@ SPLIT_PATTERN = re.compile(r'\s+|[.,:_-]')
 
 class FileType(Enum):
     VIDEO = (".mp4", ".mkv", ".webm", ".3gp")
-    AUDIO = (".mp3", ".m4a", ".wav", ".MP3")
-    IMAGE = (".jfif", ".jpg", ".png", ".jpeg", ".JPG", ".gif")
+    AUDIO = (".mp3", ".m4a", ".wav")
+    IMAGE = (".jfif", ".jpg", ".png", ".jpeg", ".gif")
     OFFICE = (".docx", ".xlsx", ".pptx", ".pdf", ".doc", ".xlsm", ".pub", ".odt")
     TEXT = (".html", ".css", ".js", ".py", ".txt", ".csv", ".json")
     ARCHIVE = (".zip", ".tar", ".7z", ".rar")
 
 
-def map_files(files, to_sort_path):
-    default_paths = {
-        FileType.VIDEO: to_sort_path / "Video files",
-        FileType.AUDIO: to_sort_path / "Audio files",
-        FileType.IMAGE: to_sort_path / "Image files",
-        FileType.OFFICE: to_sort_path / "Office files",
-        FileType.TEXT: to_sort_path / "Text files",
-        FileType.ARCHIVE: to_sort_path / "Archive files",
-    }
-    mapped_files = defaultdict(lambda: to_sort_path / "Others")
+class FileOrganizer:
+    def __init__(self, to_sort_path, to_exclude_files=None):
+        self.to_sort_path = to_sort_path
+        self.to_exclude_files = to_exclude_files
+        if self.to_exclude_files is None:
+            self.to_exclude_files = []
+        self.default_folders = set()
 
-    for file in files:
-        for file_type, path in default_paths.items():
-            if file.suffix in file_type.value:
-                mapped_files[file.suffix] = path
+    def map_files(self):
+        default_paths = {
+            FileType.VIDEO: self.to_sort_path / "Video files",
+            FileType.AUDIO: self.to_sort_path / "Audio files",
+            FileType.IMAGE: self.to_sort_path / "Image files",
+            FileType.OFFICE: self.to_sort_path / "Office files",
+            FileType.TEXT: self.to_sort_path / "Text files",
+            FileType.ARCHIVE: self.to_sort_path / "Archive files",
+        }
+        mapped_files = defaultdict(lambda: self.to_sort_path / "Others")
 
-    return mapped_files
+        for file in self.get_files():
+            for file_type, path in default_paths.items():
+                if file.suffix.lower() in file_type.value:
+                    mapped_files[file.suffix] = path
 
+        return mapped_files
 
-def move_file(file, dest):
-    if file.exists():
-        if not dest.exists():
-            dest.mkdir(parents=True, exist_ok=True)
+    def should_exclude(self, file):
+        return any(to_exclude in file.parts for to_exclude in self.to_exclude_files)
+
+    def get_files(self):
+        return [file for file in self.to_sort_path.rglob("*") if file.is_file() and not self.should_exclude(file)]
+
+    def get_folders(self):
+        return [folder for folder in self.to_sort_path.rglob("*/")if not self.should_exclude(folder)]
+
+    @staticmethod
+    def move_file(file, dest):
+        if dest.exists() and dest.is_file():
+            logging.debug('Destination folder is a file using file parent as dest...')
+            dest = dest.parent
 
         destination_file = dest / file.name
-        if destination_file.exists() and not file.samefile(destination_file):
+        if not destination_file.exists():
+            dest.mkdir(parents=True, exist_ok=True)
+
+        if destination_file.exists() and not destination_file.samefile(file):
             destination_file = new_filepath(destination_file, add_prefix='_Duplicate')
-        try:
+
+        if not destination_file.exists():
+            logging.debug(f'Moving {file} to {dest}')
             shutil.move(file, destination_file)
-        except FileNotFoundError:
-            pass
+
+    def type_sort(self):
+        unsorted_files = self.get_files()
+        mapped_files = self.map_files()
+
+        for file in unsorted_files:
+            type_dest = mapped_files[file.suffix]
+            ext_dest = type_dest.joinpath(file.suffix.strip(".") + " files" if file.suffix else " unknown files")
+            self.move_file(file, ext_dest)
+            self.default_folders.update({type_dest, ext_dest})
+
+    def prefix_sort(self, folder):
+        unsorted_files = [file for file in folder.glob('*') if file.is_file() and not self.should_exclude(file)]
+        prefix_folders = defaultdict(list)
+
+        for file in unsorted_files:
+            prefix = get_split_stem(SPLIT_PATTERN, TO_REPLACE_PATTERN, file.stem)[0]
+            prefix_folders[prefix].append(file)
+
+        if len(prefix_folders) > 1:
+            for prefix, files in prefix_folders.items():
+                if len(files) > 1:
+                    for file in files:
+                        prefix_folder = file.parent / prefix
+                        self.move_file(file, prefix_folder)
+                        self.default_folders.add(prefix_folder)
+
+    def stem_sort(self, folder):
+        unsorted_files = [file for file in folder.glob('*') if file.is_file() and not self.should_exclude(file)]
+        common_stems = get_common_stems(unsorted_files)
+        file_stems = [get_split_stem(SPLIT_PATTERN, TO_REPLACE_PATTERN, file.stem) for file in unsorted_files]
+
+        stem_folders = defaultdict(list)
+        for file, file_stem in zip(unsorted_files, file_stems):
+            for common_stem in common_stems:
+                if len(common_stem) <= len(file_stem) and all(x == y for x, y in zip(common_stem, file_stem)):
+                    stem_folders[' '.join(common_stem).strip()].append(file)
+
+        if len(stem_folders) > 1:
+            print(stem_folders)
+            for common_stem in reversed(sorted(stem_folders, key=len)):
+                print(common_stem)
+                files = stem_folders[common_stem]
+                if len(files) > 1:
+                    for file in files:
+                        stem_folder = file.parent / common_stem
+                        print(stem_folder)
+                        self.move_file(file, stem_folder)
+                        self.default_folders.add(stem_folder)
+
+    def run(self):
+        unsorted_files = self.get_files()
+        logging.info('Running type_sort...')
+        self.type_sort()
+
+        logging.info('Running prefix_sort...')
+        for folder in self.get_folders():
+            self.prefix_sort(folder)
+
+        logging.info('Running stem_sort...')
+        for folder in self.get_folders():
+            self.stem_sort(folder)
+
+        empty_folders = set(self.get_folders()) - self.default_folders
+        remove_folders(empty_folders)
+
+        logging.info('Verifying files...')
+        verify_files(unsorted_files, self.get_files())
 
 
-def verify_files(unsorted_files, sorted_files, method='Agressive'):
+def verify_files(unsorted_files, sorted_files):
     is_ok = len(unsorted_files) == len(sorted_files)
     if is_ok:
-        print(f"{method} sort successful!")
+        logging.info(f"File organization successful!")
     else:
         removed_files = set(unsorted_files) - set(sorted_files)
         if removed_files:
-            print(f"Some files are Removed!")
+            logging.error(f"Files are deleted: ")
             for file in removed_files:
-                print(file)
+                logging.error(f'Deleted: {file}')
 
 
 def remove_folders(folders):
-    for folder in folders:
-        send2trash(str(folder))
-
-
-def should_exclude(file, to_exclude_files):
-    return any(to_exclude in file.parts for to_exclude in to_exclude_files)
+    if folders:
+        logging.info('Moving empty folders to trash...')
+        for folder in folders:
+            logging.debug(f'Moving {folder} to trash...')
+            send2trash(str(folder))
 
 
 def split_stem(split_pattern, stem):
@@ -87,127 +178,26 @@ def get_split_stem(split_pattern, to_replace_pattern, stem):
     return split_stem(split_pattern, clean_stem(to_replace_pattern, stem))
 
 
-def get_all_folders(to_sort_path, to_exclude_files):
-    return {
-        folder for folder in to_sort_path.rglob("*/")
-        if not should_exclude(folder, to_exclude_files)
-    }
-
-
-def get_all_files(to_sort_path, to_exclude_files):
-    return {
-        file for file in to_sort_path.rglob("*")
-        if file.is_file() and not should_exclude(file, to_exclude_files)
-    }
-
-
 def get_common_stems(files):
     file_stems = [get_split_stem(SPLIT_PATTERN, TO_REPLACE_PATTERN, file.stem) for file in files]
 
     common_stems = []
     for x_combination, y_combination in combinations(file_stems, 2):
-        common_stem = []
-        for x_stem, y_stem in zip_longest(x_combination, y_combination, fillvalue='fill in'):
-            if x_stem == y_stem:
-                common_stem.append(x_stem)
+        common_stem = [x for x, y in zip_longest(x_combination, y_combination, fillvalue='fill in') if x == y]
         common_stems.append(tuple(common_stem))
+
     common_stems = list(set(common_stems))
+    common_stems = [list(common_stem) for common_stem in common_stems if common_stem and len(set(common_stem)) > 1]
 
     return common_stems
 
 
-def stem_sort(to_sort_path):
-    unsorted_files = [file for file in to_sort_path.glob("*") if file.is_file()]
-    common_stems = get_common_stems(unsorted_files)
-
-    stem_folders = defaultdict(list)
-    for file in unsorted_files:
-        file_stem = get_split_stem(SPLIT_PATTERN, TO_REPLACE_PATTERN, file.stem)
-        for common_stem in common_stems:
-            try:
-                if all(common_stem[i] == file_stem[i] for i in range(len(common_stem))):
-                    stem_folders[' '.join(common_stem)].append(file)
-            except IndexError:
-                pass
-
-    for common_stem, files in stem_folders.items():
-        if len(files) > 1:
-            for file in files:
-                if common_stem not in file.parts:
-                    stem_folder = file.parent / common_stem
-                    move_file(file, stem_folder)
-
-
-def prefix_sort(to_sort_path):
-    unsorted_files = [file for file in to_sort_path.glob("*") if file.is_file()]
-    prefix_folders = defaultdict(list)
-
-    for file in unsorted_files:
-        prefix = get_split_stem(SPLIT_PATTERN, TO_REPLACE_PATTERN, file.stem)[0]
-        prefix_folders[prefix].append(file)
-
-    if len(prefix_folders.keys()) > 1:
-        for prefix, files in prefix_folders.items():
-            if len(files) > 1:
-                for file in files:
-                    if prefix not in file.parts:
-                        prefix_folder = file.parent / prefix
-                        move_file(file, prefix_folder)
-
-
-def simple_sort(to_sort_path):
-    unsorted_files = {file for file in to_sort_path.glob("*") if file.is_file()}
-    existing_folders = set(to_sort_path.glob('*/'))
-
-    for file in unsorted_files:
-        ext_dest = file.parent.joinpath(file.suffix.strip(".") + " files" if file.suffix else " unknown files")
-        move_file(file, ext_dest)
-
-    new_folders = set(to_sort_path.glob('*/')) - existing_folders
-    for folder in new_folders:
-        prefix_sort(folder)
-
-    print("Simple sort Done!")
-
-
-def agressive_sort(to_sort_path, to_exclude_files=None):
-    if to_exclude_files is None:
-        to_exclude_files = []
-    unsorted_files = get_all_files(to_sort_path, to_exclude_files)
-    mapped_files = map_files(unsorted_files, to_sort_path)
-    default_folders = set()
-
-    for file in unsorted_files:
-        type_dest = mapped_files[file.suffix]
-        ext_dest = type_dest.joinpath(file.suffix.strip(".") + " files" if file.suffix else " unknown files")
-        move_file(file, ext_dest)
-        default_folders.update({type_dest, ext_dest})
-
-    all_folders = get_all_folders(to_sort_path, to_exclude_files)
-    empty_folders = all_folders - default_folders
-    remove_folders(empty_folders)
-
-    for folder in all_folders:
-        prefix_sort(folder)
-
-    for i in range(2):
-        for folder in get_all_folders(to_sort_path, to_exclude_files):
-            stem_sort(folder)
-
-    sorted_files = get_all_files(to_sort_path, to_exclude_files)
-    verify_files(unsorted_files, sorted_files)
-
-
 def main():
-    to_sort_dir = get_folder_path(task="folder you want to organize files from")
-
-    if confirm("Simple sort?", confirm_letter="yes"):
-        print(f'Organizing files in {to_sort_dir.name} ...')
-        simple_sort(to_sort_dir)
-    elif confirm("Aggressive sort?", confirm_letter="yes"):
-        print(f'Organizing files in {to_sort_dir.name} ...')
-        agressive_sort(to_sort_dir)
+    to_sort_path = Path('C:/Users/KENNETH/Desktop/Test Folder2')
+    orgnizer = FileOrganizer(to_sort_path)
+    orgnizer.run()
 
 
 if __name__ == "__main__":
+    configure_logging()
     main()
