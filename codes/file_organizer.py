@@ -31,7 +31,7 @@ class FileOrganizer:
         self.to_exclude_files = to_exclude_files
         if self.to_exclude_files is None:
             self.to_exclude_files = []
-        self.default_folders = set()
+        self.destination_folders = set()
 
     def map_files(self):
         default_paths = {
@@ -54,8 +54,18 @@ class FileOrganizer:
     def should_exclude(self, file):
         return any(to_exclude in file.parts for to_exclude in self.to_exclude_files)
 
-    def get_files(self):
-        return [file for file in self.to_sort_path.rglob("*") if file.is_file() and not self.should_exclude(file)]
+    def get_files(self, folder=None):
+        if folder is not None:
+            files = [
+                file for file in folder.glob("*")
+                if file.is_file() and not self.should_exclude(file)
+            ]
+        else:
+            files = [
+                file for file in self.to_sort_path.rglob("*")
+                if file.is_file() and not self.should_exclude(file)
+            ]
+        return files
 
     def get_folders(self):
         return [folder for folder in self.to_sort_path.rglob("*/")if not self.should_exclude(folder)]
@@ -85,10 +95,10 @@ class FileOrganizer:
             type_dest = mapped_files[file.suffix]
             ext_dest = type_dest.joinpath(file.suffix.strip(".") + " files" if file.suffix else " unknown files")
             self.move_file(file, ext_dest)
-            self.default_folders.update({type_dest, ext_dest})
+            self.destination_folders.update({type_dest, ext_dest})
 
     def prefix_sort(self, folder):
-        unsorted_files = [file for file in folder.glob('*') if file.is_file() and not self.should_exclude(file)]
+        unsorted_files = self.get_files(folder)
         prefix_folders = defaultdict(list)
 
         for file in unsorted_files:
@@ -99,12 +109,13 @@ class FileOrganizer:
             for prefix, files in prefix_folders.items():
                 if len(files) > 1:
                     for file in files:
-                        prefix_folder = file.parent / prefix
-                        self.move_file(file, prefix_folder)
-                        self.default_folders.add(prefix_folder)
+                        if prefix not in file.parts:
+                            prefix_folder = file.parent / prefix
+                            self.move_file(file, prefix_folder)
+                            self.destination_folders.add(prefix_folder)
 
     def stem_sort(self, folder):
-        unsorted_files = [file for file in folder.glob('*') if file.is_file() and not self.should_exclude(file)]
+        unsorted_files = self.get_files(folder)
         common_stems = get_common_stems(unsorted_files)
         file_stems = [get_split_stem(SPLIT_PATTERN, TO_REPLACE_PATTERN, file.stem) for file in unsorted_files]
 
@@ -115,16 +126,19 @@ class FileOrganizer:
                     stem_folders[' '.join(common_stem).strip()].append(file)
 
         if len(stem_folders) > 1:
-            print(stem_folders)
+            #  Move files to folders with longer common stem first.
             for common_stem in reversed(sorted(stem_folders, key=len)):
-                print(common_stem)
                 files = stem_folders[common_stem]
                 if len(files) > 1:
                     for file in files:
-                        stem_folder = file.parent / common_stem
-                        print(stem_folder)
-                        self.move_file(file, stem_folder)
-                        self.default_folders.add(stem_folder)
+                        if not set(common_stem.split()) <= set(file.parts):
+                            stem_folder = file.parent / common_stem
+                            self.destination_folders.add(stem_folder)
+                            try:
+                                self.move_file(file, stem_folder)
+                            except FileNotFoundError:
+                                pass  # A file mapped for the shortest common stem might be moved inside a folder
+                                # with longer common stem.
 
     def run(self):
         unsorted_files = self.get_files()
@@ -139,7 +153,7 @@ class FileOrganizer:
         for folder in self.get_folders():
             self.stem_sort(folder)
 
-        empty_folders = set(self.get_folders()) - self.default_folders
+        empty_folders = set(self.get_folders()) - self.destination_folders
         remove_folders(empty_folders)
 
         logging.info('Verifying files...')
@@ -193,11 +207,11 @@ def get_common_stems(files):
 
 
 def main():
-    to_sort_path = Path('C:/Users/KENNETH/Desktop/Test Folder2')
+    to_sort_path = Path('C:/Users/KENNETH/Desktop/Test Folder')
     orgnizer = FileOrganizer(to_sort_path)
     orgnizer.run()
 
 
 if __name__ == "__main__":
-    configure_logging()
+    configure_logging(log_level=logging.INFO)
     main()
