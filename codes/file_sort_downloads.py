@@ -1,6 +1,6 @@
 from pathlib import Path
-from file_organizer import agressive_sort, simple_sort
-from helper import choose
+from file_organizer import FileOrganizer
+from helper import choose, configure_logging
 
 DOWNLOADS = Path('~/Downloads').expanduser()
 TO_EXCLUDE = ['Torrent Downloads']
@@ -8,14 +8,16 @@ TO_EXCLUDE = ['Torrent Downloads']
 
 def main():
     print('Sort Downloads')
+    organizer = FileOrganizer(DOWNLOADS, TO_EXCLUDE)
     sort_methods = {
-        'simple': lambda: simple_sort(DOWNLOADS),
-        'agressive': lambda: agressive_sort(DOWNLOADS, TO_EXCLUDE),
+        'simple': lambda: organizer.simple_sort(),
+        'agressive': lambda: organizer.agressive_sort(),
     }
     choices = list(sort_methods.keys())
-    function = sort_methods[choose(choices)]
-    function()
+    method = sort_methods[choose(choices)]
+    method()
 
 
 if __name__ == '__main__':
+    configure_logging()
     main()
