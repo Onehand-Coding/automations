@@ -2,16 +2,10 @@ import os
 import logging
 import zipfile
 from pathlib import Path
-from helper import get_folder_path
+from tqdm import tqdm
+from helper import get_folder_path, configure_logging
 
-LOGS_DIR = Path(__file__).parents[1] / 'logs'
-LOGS_DIR.mkdir(exist_ok=True)
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    handlers=[logging.FileHandler(LOGS_DIR / 'file_archiver_logs.txt'), logging.StreamHandler()],
-)
+LOG_FILE = Path(__file__).parents[1] / "logs" / "file_archiver_logs.txt"
 
 
 class ZipArchiver:
@@ -19,7 +13,7 @@ class ZipArchiver:
         if to_exclude is None:
             to_exclude = []
         self.src_path = src_path
-        self.archive_file = dest_path / f'{self.src_path.name}.zip'
+        self.archive_file = dest_path / f"{self.src_path.name}.zip"
         self.compress_level = compress_level
         self.to_exclude = to_exclude
         self.existing_contents = self.get_existing_contents()
@@ -30,10 +24,10 @@ class ZipArchiver:
     def get_existing_contents(self):
         if not self.archive_file.exists():
             return set()
-        with zipfile.ZipFile(self.archive_file, 'r') as existing_archive:
+        with zipfile.ZipFile(self.archive_file, "r") as existing_archive:
             return set(existing_archive.namelist())
 
-    def add_files(self, archive):
+    def add_files(self, archive, progress_bar):
         for root, dirs, files in os.walk(self.src_path):
             root = Path(root)
             if self.should_exclude(root):
@@ -41,55 +35,78 @@ class ZipArchiver:
             for file in files:
                 file_path = root / file
                 arcname = file_path.relative_to(self.src_path)
-                if not self.should_exclude(arcname) and arcname.as_posix() not in self.existing_contents:
+                if (
+                    not self.should_exclude(arcname)
+                    and arcname.as_posix() not in self.existing_contents
+                ):
                     archive.write(file_path, arcname=arcname)
+                    progress_bar.update(1)
 
     def create(self):
         with zipfile.ZipFile(
-            self.archive_file, 'w',
+            self.archive_file,
+            "w",
             zipfile.ZIP_DEFLATED,
             compresslevel=self.compress_level,
         ) as archive:
-
-            self.add_files(archive)
+            total_files = sum(len(files) for _, _, files in os.walk(self.src_path))
+            with tqdm(
+                total=total_files,
+                desc=f"Archiving ({total_files} files)",
+                unit="file",
+                unit_scale=True,
+                unit_divisor=total_files,
+            ) as pbar:
+                self.add_files(archive, pbar)
 
     def update(self):
         with zipfile.ZipFile(
-            self.archive_file, 'a',
+            self.archive_file,
+            "a",
             zipfile.ZIP_DEFLATED,
             compresslevel=self.compress_level,
         ) as archive:
-
-            self.add_files(archive)
+            total_files = sum(len(files) for _, _, files in os.walk(self.src_path))
+            with tqdm(
+                total=total_files,
+                desc=f"Updating ({total_files} files)",
+                unit="file",
+                unit_scale=True,
+                unit_divisor=total_files,
+            ) as pbar:
+                self.add_files(archive, pbar)
 
     def run(self):
         try:
             if not self.archive_file.exists():
-                logging.info(f'Creating {self.archive_file.name}...')
+                logging.info(f"Creating {self.archive_file.name}...")
                 self.create()
                 logging.info(f"Archive created successfully!")
             else:
-                logging.info(f'Updating {self.archive_file.name}...')
+                logging.info(f"Updating {self.archive_file.name}...")
                 self.update()
                 logging.info(f"Archive updated successfully!")
 
         except (zipfile.BadZipFile, PermissionError) as e:
             logging.error(f"Error updating archive: {str(e)}")
         except Exception as e:
-            logging.error(f'Error: {str(e)}')
+            logging.error(f"Error: {str(e)}")
         except KeyboardInterrupt:
-            logging.error('Script interrupted!')
+            logging.error("Script interrupted!")
 
 
 def main():
-    folder_to_archive = get_folder_path('folder you want to archive')
-    backups_folder = Path('D:/KENNETH/Backups')
+    configure_logging(log_level=logging.ERROR)
+    folder_to_archive = get_folder_path("folder you want to archive")
+    backups_folder = Path("D:/KENNETH/Backups")
     compress_level = 6
-    to_exclude = ['__pycache__', '.venv', 'default.rdp', 'desktop.ini']
+    to_exclude = ["__pycache__", ".venv", "default.rdp", "desktop.ini"]
 
-    zip_archiver = ZipArchiver(folder_to_archive, backups_folder, compress_level, to_exclude)
+    zip_archiver = ZipArchiver(
+        folder_to_archive, backups_folder, compress_level, to_exclude
+    )
     zip_archiver.run()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
