@@ -128,9 +128,10 @@ def configure_logging(
         *,
         log_level=logging.DEBUG,
         log_file=None,
-        log_format="%(asctime)s - %(levelname)s - %(message)s"
+        log_format="%(asctime)s - %(levelname)s - %(message)s",
+        file_mode='w'
 ):
-    log_handlers = [logging.StreamHandler() if log_file is None else logging.FileHandler(log_file)]
+    log_handlers = [logging.StreamHandler() if log_file is None else logging.FileHandler(log_file, mode=file_mode)]
 
     logging.basicConfig(
         level=log_level,
