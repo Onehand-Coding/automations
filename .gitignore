@@ -13,5 +13,6 @@ scratch.py
 
 #===== Project ignored =====#
 # Folders #
+tests/
 
 # Files #
