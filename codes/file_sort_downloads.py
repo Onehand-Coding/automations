@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from file_organizer import FileOrganizer
 from helper import choose, configure_logging
@@ -11,7 +12,7 @@ def main():
     organizer = FileOrganizer(DOWNLOADS, TO_EXCLUDE)
     sort_methods = {
         'simple': lambda: organizer.simple_sort(),
-        'agressive': lambda: organizer.agressive_sort(),
+        'agressive': lambda: organizer.recursive_sort(),
     }
     choices = list(sort_methods.keys())
     method = sort_methods[choose(choices)]
@@ -19,5 +20,5 @@ def main():
 
 
 if __name__ == '__main__':
-    configure_logging()
+    configure_logging(log_level=logging.INFO)
     main()

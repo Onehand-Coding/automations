@@ -69,7 +69,7 @@ class FileOrganizer:
             files = [
                 Path(root) / file
                 for root, dirs, files in os.walk(self.to_sort_path)
-                for file in files if not self.should_exclude(Path(file))
+                for file in files if not self.should_exclude(Path(root) / file)
             ]
         return files
 
