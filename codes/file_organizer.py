@@ -1,3 +1,4 @@
+import os
 import re
 import shutil
 import logging
@@ -29,8 +30,12 @@ class FileOrganizer:
     def __init__(self, to_sort_path, to_exclude_files=None):
         self.to_sort_path = to_sort_path
         self.to_exclude_files = to_exclude_files
+
         if self.to_exclude_files is None:
             self.to_exclude_files = []
+        if not isinstance(self.to_exclude_files, list):
+            raise TypeError("to to_exclude_files args must be a list file or folder names!")
+
         self.destination_folders = set()
 
     def map_files(self):
@@ -62,8 +67,9 @@ class FileOrganizer:
             ]
         else:
             files = [
-                file for file in self.to_sort_path.rglob("*")
-                if file.is_file() and not self.should_exclude(file)
+                Path(root) / file
+                for root, dirs, files in os.walk(self.to_sort_path)
+                for file in files if not self.should_exclude(Path(file))
             ]
         return files
 
@@ -73,7 +79,7 @@ class FileOrganizer:
     @staticmethod
     def move_file(file, dest):
         if dest.exists() and dest.is_file():
-            logging.debug('Destination folder is a file using file parent as dest...')
+            logging.debug('Destination folder has the same name as the file. Using file parent as destination...')
             dest = dest.parent
 
         destination_file = dest / file.name
@@ -85,12 +91,14 @@ class FileOrganizer:
 
         if not destination_file.exists():
             logging.debug(f'Moving {file} to {dest}')
-            shutil.move(file, destination_file)
+            try:
+                shutil.move(file, destination_file)
+            except FileNotFoundError:
+                logging.warning(f'Not moved: {file}')
 
     def type_sort(self):
         unsorted_files = self.get_files()
         mapped_files = self.map_files()
-
         for file in unsorted_files:
             type_dest = mapped_files[file.suffix]
             ext_dest = type_dest.joinpath(file.suffix.strip(".") + " files" if file.suffix else " unknown files")
@@ -99,8 +107,8 @@ class FileOrganizer:
 
     def prefix_sort(self, folder):
         unsorted_files = self.get_files(folder)
-        prefix_folders = defaultdict(list)
 
+        prefix_folders = defaultdict(list)
         for file in unsorted_files:
             prefix = get_split_stem(SPLIT_PATTERN, TO_REPLACE_PATTERN, file.stem)[0]
             prefix_folders[prefix].append(file)
@@ -131,28 +139,27 @@ class FileOrganizer:
                 files = stem_folders[common_stem]
                 if len(files) > 1:
                     for file in files:
-                        if not set(common_stem.split()) <= set(file.parts):
+                        if file.exists() and not set(common_stem.split()) <= set(file.parts):
                             stem_folder = file.parent / common_stem
+                            self.move_file(file, stem_folder)
                             self.destination_folders.add(stem_folder)
-                            try:
-                                self.move_file(file, stem_folder)
-                            except FileNotFoundError:
-                                pass  # A file mapped for the shortest common stem might be moved inside a folder
-                                # with longer common stem.
 
     def simple_sort(self):
         unsorted_files = self.get_files(self.to_sort_path)
         existing_folders = set(self.to_sort_path.glob('*/'))
 
+        logging.info('Running simple sort...')
         for file in unsorted_files:
             ext_dest = file.parent.joinpath(file.suffix.strip(".") + " files" if file.suffix else " unknown files")
             self.move_file(file, ext_dest)
 
+        logging.info('Running prefix_sort...')
         new_folders = set(self.to_sort_path.glob('*/')) - existing_folders
         for folder in new_folders:
             self.prefix_sort(folder)
 
-        logging.info("Simple sort Done!")
+        logging.info('Verifying files...')
+        verify_files(unsorted_files, self.get_files(self.to_sort_path), method='Simple')
 
     def recursive_sort(self):
         unsorted_files = self.get_files()
@@ -171,19 +178,24 @@ class FileOrganizer:
         remove_folders(empty_folders)
 
         logging.info('Verifying files...')
-        verify_files(unsorted_files, self.get_files())
+        verify_files(unsorted_files, self.get_files(), empty_folders, method='Aggressive')
 
 
-def verify_files(unsorted_files, sorted_files):
+def verify_files(unsorted_files, sorted_files, folders, *, method=''):
+    def get_deleted_file_container(file):
+        for folder in sorted(folders):
+            if folder.name in file.parts:
+                return folder.name
+
     is_ok = len(unsorted_files) == len(sorted_files)
     if is_ok:
-        logging.info(f"File organization successful!")
+        logging.info(f"{method} file organization successful!")
     else:
         removed_files = set(unsorted_files) - set(sorted_files)
         if removed_files:
-            logging.error(f"Files are deleted: ")
+            logging.error(f"Files are included in folder deletion!")
             for file in removed_files:
-                logging.error(f'Deleted: {file}')
+                logging.error(f'Deleted: {file.name} from folder: {get_deleted_file_container(file)}')
 
 
 def remove_folders(folders):
@@ -224,10 +236,10 @@ def main():
     to_sort_path = get_folder_path(task="folder you want to organize files from")
     orgnizer = FileOrganizer(to_sort_path)
 
-    if confirm("Simple sort?", confirm_letter="yes"):
+    if confirm("Simple sort?", choice='(yes/no)', confirm_letter="yes"):
         print(f'Organizing files in {to_sort_path.name} ...')
         orgnizer.simple_sort()
-    elif confirm("Aggressive sort?", confirm_letter="yes"):
+    elif confirm("Aggressive sort?", choice='(yes/no)', confirm_letter="yes"):
         print(f'Organizing files in {to_sort_path.name} ...')
         orgnizer.recursive_sort()
 
