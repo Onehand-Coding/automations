@@ -4,7 +4,7 @@ from file_organizer import FileOrganizer
 from helper import choose, configure_logging
 
 DOWNLOADS = Path('~/Downloads').expanduser()
-TO_EXCLUDE = ['Torrent Downloads']
+TO_EXCLUDE = ['Torrent Downloads', 'Page Downloads']
 
 
 def main():
