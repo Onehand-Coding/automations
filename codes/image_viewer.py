@@ -1,13 +1,15 @@
 import re
 import time
 import logging
+import webbrowser
 from datetime import date
 
 import pyexiv2
+from gmplot import gmplot
 from geopy.geocoders import Nominatim
 from geopy.exc import GeocoderTimedOut, GeocoderUnavailable
 
-from helper import get_folder_path, configure_logging
+from helper import get_folder_path, configure_logging, confirm, data_folder
 
 
 class ImageFile:
@@ -82,6 +84,15 @@ def is_image(file):
     return file.is_file() and file.suffix.lower() in ('.jpg', 'jpeg', 'png')
 
 
+def view_on_map(coordinates):
+    lat, lon = coordinates
+    gmap = gmplot.GoogleMapPlotter(lat, lon, 12)
+    gmap.marker(lat, lon, 'cornflowerblue')
+    gmap.draw(data_folder / 'location.html')
+
+    webbrowser.open(str(data_folder) + 'location.html')
+
+
 def get_from_folder(folder):
     image_files = [file for file in folder.rglob('*') if is_image(file)]
     for file in image_files:
@@ -116,8 +127,12 @@ def get_from_file(image_file):
         except RuntimeError as e:
             logging.error(f'Error {image_file}: {e}')
 
+        if confirm('view location on map?'):
+            view_on_map(image.coordinates)
+
 
 def main():
+    configure_logging()
     image_file = get_folder_path('file or folder you want to get image info.')
 
     if image_file.is_dir():
@@ -126,6 +141,44 @@ def main():
         get_from_file(image_file)
 
 
-if __name__ == '__main__':
-    configure_logging()
-    main()
+# if __name__ == '__main__':
+#     main()
+
+
+from tkinter import Tk, Label, Button, filedialog
+from PIL import Image, ImageTk
+
+class ImageViewer:
+    def __init__(self, master):
+        self.master = master
+        self.master.geometry('250x250')
+        self.master.title("Image Viewer")
+
+        self.image_path = None
+        self.image = None
+        self.image_label = Label(self.master)
+        self.image_label.pack()
+
+        self.load_button = Button(self.master, text="Open Image", command=self.load_image)
+        self.load_button.pack()
+
+    def load_image(self):
+        file_path = filedialog.askopenfilename(filetypes=[("Image files", "*.png;*.jpg;*.jpeg;*.gif;*.bmp")])
+        if file_path:
+            self.image_path = file_path
+            self.display_image()
+
+    def display_image(self):
+        if self.image_path:
+            image = Image.open(self.image_path)
+            # Resize the image to fit the window
+            image = image.resize((400, 400), Image.Resampling.LANCZOS)
+            self.image = ImageTk.PhotoImage(image)
+            self.image_label.config(image=self.image)
+            self.image_label.image = self.image
+
+
+if __name__ == "__main__":
+    root = Tk()
+    app = ImageViewer(root)
+    root.mainloop()
