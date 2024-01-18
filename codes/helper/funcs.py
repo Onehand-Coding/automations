@@ -5,6 +5,12 @@ import logging
 from pathlib import Path
 from datetime import datetime
 
+data_folder = Path('C:/coding/python/my_codes/automations/data')
+data_folder.mkdir(exist_ok=True)
+
+log_folder = Path('C:/coding/python/my_codes/automations/data')
+log_folder.mkdir(exist_ok=True)
+
 
 def confirm(question, /, *, choice="(Y/n)", confirm_letter='y'):
     """Prompt user for confirmation."""
