@@ -1,13 +1,14 @@
 import os
+import sys
 import json
 import subprocess
 from pathlib import Path
 
 MAIN_PROJECT_FOLDER = Path('C:/coding/python/my_codes/projects')
 
-project_sub_folders = ['.sublime-project-files', 'codes', 'resources', 'logs', 'data']
-project_files = ['README.md', 'requirements.txt']
-ignored_files = [
+PROJECT_SUB_FOLDERS = ['.sublime-project-files', 'codes', 'resources', 'logs', 'data']
+PROJECT_FILES = ['README.md', 'requirements.txt']
+IGNORED_FILES = [
     '#===== Default ignored =====#\n',
     '# Folders #\n',
     '.sublime-project-files/\n',
@@ -30,36 +31,34 @@ ignored_files = [
 def create_sublime_project_file(project_name, project_dir):
     print('Creating sublime project file...')
     project_file = project_dir / '.sublime-project-files' / f'python-{project_name}.sublime-project'
-    template = {
-    "folders":
-    [
-        {
-            "path": f"{project_file.parent.parent.as_posix()}"
+    project_config = {}
+
+    project_folder = {"path": f"{project_dir.as_posix()}"}
+    project_build_system = {
+        "name": f"{project_name}",
+        "target": "terminus_open",
+        "title": f"{project_name}",
+        "tag": "python",
+        "auto_close": False,
+        "focus": True,
+        "timeit": False,
+        "shell_cmd": "python -u \"$file\"",
+        "file_regex": "^[ ]*File \"(...*?)\", line ([0-9]*)",
+        "working_dir": "${file_path}",
+        "file_patterns": ["*.py"],
+        "selector": "source.python",
+        "env": {
+            "PATH": f"$PATH;{project_dir.as_posix()}/.venv/Scripts",
         }
-    ],
-    "build_systems":
-    [
-        {
-            "name": f"{project_name}",
-            "target":"terminus_open",
-            "title":f"{project_name}",
-            "tag":"python",
-            "auto_close": False,
-            "focus": True,
-            "timeit": False,
-            "shell_cmd": "python -u \"$file\"",
-            "file_regex": "^[ ]*File \"(...*?)\", line ([0-9]*)",
-            "working_dir": "${file_path}",
-            "file_patterns":["*.py"],
-            "selector": "source.python",
-            "env": {
-                        "PATH": f"$PATH;{project_file.parent.parent.as_posix()}/.venv/Scripts",
-                   }
-        }
-    ]
-}
+    }
+    project_config.setdefault("folders", [])
+    project_config["folders"].append(project_folder)
+
+    project_config.setdefault("build_systems", [])
+    project_config["build_systems"].append(project_build_system)
+
     with open(project_file, 'w') as f:
-        json.dump(template, f, indent=4)
+        json.dump(project_config, f, indent=4)
 
 
 def get_project_name():
@@ -107,15 +106,23 @@ def create_new_project(project_name=None):
     project_dir.mkdir(exist_ok=True)
 
     create_virtual_env(project_dir)
-    create_folders(project_dir, project_sub_folders)
-    create_files(project_dir, project_files)
-    create_gitignore_file(project_dir, ignored_files)
+    create_folders(project_dir, PROJECT_SUB_FOLDERS)
+    create_files(project_dir, PROJECT_FILES)
+    create_gitignore_file(project_dir, IGNORED_FILES)
     create_sublime_project_file(project_name, project_dir)
 
-    print('Done!')
+
+def main():
+    project_name = get_project_name()
+    print(f'Creating new python project: {project_name} ...')
+    try:
+        create_new_project(project_name)
+    except Exception as e:
+        print(f'New project creation Error: {e}')
+        sys.exit()
+    else:
+        print('Done!')
 
 
 if __name__ == '__main__':
-    project_name = get_project_name()
-    print(f'Creating new python project: {project_name} ...')
-    create_new_project(project_name)
+    main()
