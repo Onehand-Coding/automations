@@ -34,7 +34,7 @@ def create_sublime_project_file(project_name, project_dir):
     "folders":
     [
         {
-            "path": f"{project_file.parent.parent}"
+            "path": f"{project_file.parent.parent.as_posix()}"
         }
     ],
     "build_systems":
@@ -53,7 +53,7 @@ def create_sublime_project_file(project_name, project_dir):
             "file_patterns":["*.py"],
             "selector": "source.python",
             "env": {
-                        "PATH": f"$PATH;{project_file.parent.parent}/.venv/Scripts",
+                        "PATH": f"$PATH;{project_file.parent.parent.as_posix()}/.venv/Scripts",
                    }
         }
     ]
