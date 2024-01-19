@@ -29,7 +29,7 @@ ignored_files = [
 
 def create_sublime_project_file(project_name, project_dir):
     print('Creating sublime project file...')
-    project_file = project_dir / '.sublime-project-files' / f'{project_name}.sublime-project'
+    project_file = project_dir / '.sublime-project-files' / f'python-{project_name}.sublime-project'
     template = {
     "folders":
     [
@@ -44,9 +44,9 @@ def create_sublime_project_file(project_name, project_dir):
             "target":"terminus_open",
             "title":f"{project_name}",
             "tag":"python",
-            "auto_close": "false",
-            "focus": "true",
-            "timeit": "false",
+            "auto_close": False,
+            "focus": True,
+            "timeit": False,
             "shell_cmd": "python -u \"$file\"",
             "file_regex": "^[ ]*File \"(...*?)\", line ([0-9]*)",
             "working_dir": "${file_path}",
@@ -117,5 +117,5 @@ def create_new_project(project_name=None):
 
 if __name__ == '__main__':
     project_name = get_project_name()
-    print(f'Creating new project: {project_name} ...')
+    print(f'Creating new python project: {project_name} ...')
     create_new_project(project_name)
