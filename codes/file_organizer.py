@@ -23,7 +23,7 @@ class FileType(Enum):
     IMAGE = (".jfif", ".jpg", ".png", ".jpeg", ".gif")
     OFFICE = (".docx", ".xlsx", ".pptx", ".pdf", ".doc", ".xlsm", ".pub", ".odt")
     TEXT = (".html", ".css", ".js", ".py", ".txt", ".csv", ".json")
-    ARCHIVE = (".zip", ".tar", ".7z", ".rar")
+    ARCHIVE = (".zip", ".tar", ".7z", ".rar", ".gz")
 
 
 class FileOrganizer:
@@ -38,7 +38,7 @@ class FileOrganizer:
 
         self.destination_folders = set()
 
-    def map_files(self):
+    def map_file_extensions(self):
         default_paths = {
             FileType.VIDEO: self.to_sort_path / "Video files",
             FileType.AUDIO: self.to_sort_path / "Audio files",
@@ -61,10 +61,7 @@ class FileOrganizer:
 
     def get_files(self, folder=None):
         if folder is not None:
-            files = [
-                file for file in folder.glob("*")
-                if file.is_file() and not self.should_exclude(file)
-            ]
+            files = [file for file in folder.glob("*") if file.is_file() and not self.should_exclude(file)]
         else:
             files = [
                 Path(root) / file
@@ -93,12 +90,12 @@ class FileOrganizer:
             logging.debug(f'Moving {file} to {dest}')
             try:
                 shutil.move(file, destination_file)
-            except FileNotFoundError:
-                logging.warning(f'Not moved: {file}')
+            except FileNotFoundError:  # TODO: Impliment a logic for this.
+                logging.warning(f'Not moved: {file}, This file may be deleted.')
 
     def type_sort(self):
         unsorted_files = self.get_files()
-        mapped_files = self.map_files()
+        mapped_files = self.map_file_extensions()
         for file in unsorted_files:
             type_dest = mapped_files[file.suffix]
             ext_dest = type_dest.joinpath(file.suffix.strip(".") + " files" if file.suffix else " unknown files")
@@ -134,7 +131,6 @@ class FileOrganizer:
                     stem_folders[' '.join(common_stem).strip()].append(file)
 
         if len(stem_folders) > 1:
-            #  Move files to folders with longer common stem first.
             for common_stem in reversed(sorted(stem_folders, key=len)):
                 files = stem_folders[common_stem]
                 if len(files) > 1:
@@ -182,20 +178,22 @@ class FileOrganizer:
 
 
 def verify_files(unsorted_files, sorted_files, folders, *, method=''):
-    def get_deleted_file_container(file):
-        for folder in sorted(folders):
-            if folder.name in file.parts:
-                return folder.name
+    def get_deleted_file_container(filename):
+        file = [file for file in unsorted_files if file.name == filename][0]
+        longest_container = max(len(folder.parts) for folder in folders if folder.name in file.parts)
+        return [folder.name for folder in folders if len(folder.parts) == longest_container][0]
 
-    is_ok = len(unsorted_files) == len(sorted_files)
-    if is_ok:
+    unsorted_filenames = {file.name for file in unsorted_files}
+    sorted_filenames = {file.name for file in sorted_files}
+
+    if len(unsorted_filenames) == len(sorted_filenames):
         logging.info(f"{method} file organization successful!")
     else:
-        removed_files = set(unsorted_files) - set(sorted_files)
-        if removed_files:
-            logging.error(f"Files are included in folder deletion!")
-            for file in removed_files:
-                logging.error(f'Deleted: {file.name} from folder: {get_deleted_file_container(file)}')
+        removed_filenames = unsorted_filenames - sorted_filenames
+        if removed_filenames:
+            logging.error(f"There are files included during folder deletion!")
+            for filename in removed_filenames:
+                logging.error(f'Deleted: {filename} from Folder: {get_deleted_file_container(filename)}')
 
 
 def remove_folders(folders):
@@ -233,6 +231,7 @@ def get_common_stems(files):
 
 
 def main():
+    configure_logging(log_level=logging.INFO)
     to_sort_path = get_folder_path(task="folder you want to organize files from")
     orgnizer = FileOrganizer(to_sort_path)
 
@@ -245,5 +244,4 @@ def main():
 
 
 if __name__ == "__main__":
-    configure_logging(log_level=logging.INFO)
     main()

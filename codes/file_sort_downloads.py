@@ -14,7 +14,7 @@ def main():
         'simple': lambda: organizer.simple_sort(),
         'agressive': lambda: organizer.recursive_sort(),
     }
-    choices = list(sort_methods.keys())
+    choices = list(sort_methods)
     method = sort_methods[choose(choices)]
     method()
 
