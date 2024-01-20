@@ -7,10 +7,7 @@ from helper import write_to_json, read_print_json
 def getSSIDS():
     """Return the list ssid of previous and present wifi connections of the device."""
     print("Getting wifi ssids...")
-    wifiProfiles = subprocess.run(
-        ["netsh", "wlan", "show", "profiles"], capture_output=True
-    ).stdout.decode()
-
+    wifiProfiles = subprocess.run(["netsh", "wlan", "show", "profiles"], capture_output=True).stdout.decode()
     wifissids = re.findall(r"All User Profile     : (.*)\r", wifiProfiles)
 
     return wifissids
@@ -25,18 +22,14 @@ def getPasswords(ssids):
         wifissidAndPassword = {}
         wifissidAndPassword["SSID"] = ssid
 
-        try:  # Wifi name/ssid's can be named with characters that cannot be decoded by .decode() method.
+        try:  # Wifi name/ssid's might be named with characters that causes decode() error.
             output = subprocess.run(
                 ["netsh", "wlan", "show", "profile", ssid, "key=clear"], capture_output=True,).stdout.decode()
         except UnicodeDecodeError:
             continue
 
         password = re.findall(r"Key Content            : (.*)\r", output)
-        if not password:
-            wifissidAndPassword["Password"] = "No password"
-        else:
-            wifissidAndPassword["Password"] = password[0]
-
+        wifissidAndPassword["Password"] = password[0] if password else "No password"
         wifiList.append(wifissidAndPassword)
 
     return wifiList
@@ -54,7 +47,6 @@ def main():
     print(f"Writing wifi data to json file...")
     write_to_json(wifiDataFile, wifiDataKey, myWifiData)
     read_print_json(wifiDataFile)
-    print('Done!')
 
 
 if __name__ == '__main__':
