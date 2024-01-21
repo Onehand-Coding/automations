@@ -48,7 +48,6 @@ class FileOrganizer:
             FileType.ARCHIVE: self.to_sort_path / "Archive files",
         }
         mapped_files = defaultdict(lambda: self.to_sort_path / "Others")
-
         for file in self.get_files():
             for file_type, path in default_paths.items():
                 if file.suffix.lower() in file_type.value:
@@ -75,7 +74,7 @@ class FileOrganizer:
 
     @staticmethod
     def move_file(file, dest):
-        if dest.exists() and dest.is_file():
+        if dest.exists() and dest.is_file():  # TODO: Impliment a logic for this.
             logging.debug('Destination folder has the same name as the file. Using file parent as destination...')
             dest = dest.parent
 
@@ -177,11 +176,13 @@ class FileOrganizer:
         verify_files(unsorted_files, self.get_files(), empty_folders, method='Aggressive')
 
 
-def verify_files(unsorted_files, sorted_files, folders, *, method=''):
-    def get_deleted_file_container(filename):
+def verify_files(unsorted_files, sorted_files, empty_folders=None, *, method=''):
+    if empty_folders is None:
+        empty_folders = []
+
+    def get_deleted_file_container(filename):  # TODO: Find better implimentation.
         file = [file for file in unsorted_files if file.name == filename][0]
-        longest_container = max(len(folder.parts) for folder in folders if folder.name in file.parts)
-        return [folder.name for folder in folders if len(folder.parts) == longest_container][0]
+        return [folder.name for folder in empty_folders if set(folder.parts) <= set(file.parts)][0]
 
     unsorted_filenames = {file.name for file in unsorted_files}
     sorted_filenames = {file.name for file in sorted_files}
