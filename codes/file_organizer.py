@@ -12,7 +12,6 @@ from send2trash import send2trash
 from helper import get_folder_path, new_filepath, confirm, configure_logging
 
 LOG_FILE = Path(__file__).parents[1] / 'logs' / 'file_organizer_logs.txt'
-
 TO_REPLACE_PATTERN = re.compile(r'\[.*\]|\(.*\)')
 SPLIT_PATTERN = re.compile(r'\s+|[.,:_-]')
 
@@ -30,12 +29,10 @@ class FileOrganizer:
     def __init__(self, to_sort_path, to_exclude_files=None):
         self.to_sort_path = to_sort_path
         self.to_exclude_files = to_exclude_files
-
         if self.to_exclude_files is None:
             self.to_exclude_files = []
         if not isinstance(self.to_exclude_files, list):
             raise TypeError("to to_exclude_files args must be a list file or folder names!")
-
         self.destination_folders = set()
 
     def map_file_extensions(self):
@@ -58,6 +55,9 @@ class FileOrganizer:
     def should_exclude(self, file):
         return any(to_exclude in file.parts for to_exclude in self.to_exclude_files)
 
+    def get_folders(self):
+        return [folder for folder in self.to_sort_path.rglob("*/")if not self.should_exclude(folder)]
+
     def get_files(self, folder=None):
         if folder is not None:
             files = [file for file in folder.glob("*") if file.is_file() and not self.should_exclude(file)]
@@ -69,12 +69,9 @@ class FileOrganizer:
             ]
         return files
 
-    def get_folders(self):
-        return [folder for folder in self.to_sort_path.rglob("*/")if not self.should_exclude(folder)]
-
     @staticmethod
     def move_file(file, dest):
-        if dest.exists() and dest.is_file():  # TODO: Impliment a logic for this.
+        if dest.exists() and dest.is_file():  # TODO: Impliment a better logic for this.
             logging.debug('Destination folder has the same name as the file. Using file parent as destination...')
             dest = dest.parent
 
@@ -89,7 +86,7 @@ class FileOrganizer:
             logging.debug(f'Moving {file} to {dest}')
             try:
                 shutil.move(file, destination_file)
-            except FileNotFoundError:  # TODO: Impliment a logic for this.
+            except FileNotFoundError:  # TODO: Impliment a better logic for this.
                 logging.warning(f'Not moved: {file}, This file may be deleted.')
 
     def type_sort(self):
@@ -194,7 +191,7 @@ def verify_files(unsorted_files, sorted_files, empty_folders=None, *, method='')
         if removed_filenames:
             logging.error(f"There are files included during folder deletion!")
             for filename in removed_filenames:
-                logging.error(f'Deleted: {filename} from Folder: {get_deleted_file_container(filename)}')
+                logging.error(f'Deleted file: {filename} from Folder: {get_deleted_file_container(filename)}')
 
 
 def remove_folders(folders):

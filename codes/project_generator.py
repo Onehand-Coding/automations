@@ -3,6 +3,7 @@ import sys
 import json
 import subprocess
 from pathlib import Path
+from collections import defaultdict
 
 MAIN_PROJECT_FOLDER = Path('C:/coding/python/my_codes/projects')
 
@@ -31,7 +32,6 @@ IGNORED_FILES = [
 def create_sublime_project_file(project_name, project_dir):
     print('Creating sublime project file...')
     project_file = project_dir / '.sublime-project-files' / f'python-{project_name}.sublime-project'
-    project_config = {}
 
     project_folder = {"path": f"{project_dir.as_posix()}"}
     project_build_system = {
@@ -51,10 +51,8 @@ def create_sublime_project_file(project_name, project_dir):
             "PATH": f"$PATH;{project_dir.as_posix()}/.venv/Scripts",
         }
     }
-    project_config.setdefault("folders", [])
+    project_config = defaultdict(list)
     project_config["folders"].append(project_folder)
-
-    project_config.setdefault("build_systems", [])
     project_config["build_systems"].append(project_build_system)
 
     with open(project_file, 'w') as f:
@@ -99,7 +97,7 @@ def create_gitignore_file(project_dir, to_ignore_files):
         f.writelines(to_ignore_files)
 
 
-def create_new_project(project_name=None):
+def generate_project(project_name=None):
     if project_name is None:
         project_name = 'New Project'
     project_dir = MAIN_PROJECT_FOLDER / project_name
@@ -114,9 +112,9 @@ def create_new_project(project_name=None):
 
 def main():
     project_name = get_project_name()
-    print(f'Creating new python project: {project_name} ...')
+    print(f'Generating new python project: {project_name} ...')
     try:
-        create_new_project(project_name)
+        generate_project(project_name)
     except Exception as e:
         print(f'New project creation Error: {e}')
         sys.exit()
