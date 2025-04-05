@@ -1,5 +1,3 @@
-#===== Default ignored =====#
-# Folders #
 .sublime-project-files/
 __pycache__/
 .venv/
@@ -14,5 +12,3 @@ scratch.py
 #===== Project ignored =====#
 # Folders #
 tests/
-
-# Files #
