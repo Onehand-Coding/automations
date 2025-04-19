@@ -1,14 +1,10 @@
-.sublime-project-files/
+*.sublime-*
 __pycache__/
-.venv/
 resources/
 data/
 logs/
-# Files #
+tests/
+.venv/
 __main__.py
 __init__.py
-scratch.py
-
-#===== Project ignored =====#
-# Folders #
-tests/
+.env
