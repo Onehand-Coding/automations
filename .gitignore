@@ -5,6 +5,4 @@ data/
 logs/
 tests/
 .venv/
-__main__.py
-__init__.py
 .env
