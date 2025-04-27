@@ -10,6 +10,8 @@ import sys
 from pathlib import Path
 from tqdm import tqdm
 from stat import S_ISREG # Needed for the OSError handling refinement
+from datetime import datetime
+from datetime import datetime, timezone
 
 # --- Constants ---
 SUPPORTED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".heic", ".bmp", ".tiff", ".tif"}
@@ -161,6 +163,8 @@ def find_matching_json(media_path: Path):
 def embed_metadata(media_path: Path, json_path: Path, dry_run: bool):
     """
     Embeds metadata from the JSON file into the media file using exiftool.
+    Prioritizes setting specific date/time tags from photoTakenTime.timestamp.
+    Includes support for large files.
     Returns True on success, False on failure.
     """
     # This message goes to file, and console if verbose
@@ -171,11 +175,30 @@ def embed_metadata(media_path: Path, json_path: Path, dry_run: bool):
         logger.error(f"JSON file not found during embed attempt: {json_path}")
         return False
 
-    # Basic JSON validation (optional but good practice)
+    # Load JSON data to extract timestamp
+    metadata = None
+    formatted_date = None
     try:
         with open(json_path, 'r', encoding='utf-8') as f:
-            json.load(f)
+            metadata = json.load(f)
         logger.debug(f"Successfully parsed JSON: {json_path.name}") # Debug level
+
+        # Extract and format the primary timestamp
+        if 'photoTakenTime' in metadata and 'timestamp' in metadata.get('photoTakenTime', {}):
+            timestamp_str = metadata['photoTakenTime']['timestamp']
+            try:
+                timestamp_int = int(timestamp_str)
+                # Convert Unix timestamp (UTC) to datetime object using timezone-aware method
+                dt_object = datetime.fromtimestamp(timestamp_int, timezone.utc) # FIX for DeprecationWarning
+                # Format for exiftool (-d '%Y:%m:%d %H:%M:%S' is implicit default for assignments)
+                formatted_date = dt_object.strftime('%Y:%m:%d %H:%M:%S')
+                logger.debug(f"Extracted photoTakenTime for {media_path.name}: {formatted_date}")
+            except (ValueError, TypeError) as ts_err:
+                logger.warning(f"Could not parse timestamp '{timestamp_str}' from {json_path.name}: {ts_err}")
+                formatted_date = None
+        else:
+            logger.warning(f"JSON file {json_path.name} does not contain 'photoTakenTime.timestamp'. Will rely on basic -tagsFromFile for dates.")
+
     except json.JSONDecodeError as e:
         logger.error(f"Invalid JSON file {json_path.name}: {e}")
         return False
@@ -184,32 +207,73 @@ def embed_metadata(media_path: Path, json_path: Path, dry_run: bool):
         return False
 
     if dry_run:
-        # Info message goes to file, and console if verbose
-        logger.info(f"[DRY RUN] Would embed metadata from {json_path.name} into {media_path.name}")
+        if formatted_date:
+             # Info message goes to file, and console if verbose
+            logger.info(f"[DRY RUN] Would embed metadata from {json_path.name} into {media_path.name}, setting dates to {formatted_date}")
+        else:
+             logger.info(f"[DRY RUN] Would attempt generic embed from {json_path.name} into {media_path.name} (no specific date extracted)")
         return True # Simulate success in dry run
 
     try:
+        # Base command - always try to pull tags generally
         cmd = [
             "exiftool",
             "-charset", "UTF-8",
+            "-api", "LargeFileSupport=1",  # <<<--- FIX for large file error
             "-tagsFromFile", str(json_path),
-            "-overwrite_original",
-            "-P", # Preserve file modification time
-            str(media_path)
         ]
+
+        # If we have a specific date, add explicit tag assignments.
+        # These will overwrite any conflicting date tags pulled by -tagsFromFile.
+        if formatted_date:
+            date_tags = [
+                # Standard EXIF/XMP tags (useful for images and some video containers)
+                f"-DateTimeOriginal={formatted_date}",
+                f"-CreateDate={formatted_date}",
+                f"-ModifyDate={formatted_date}",
+                 # QuickTime/MP4 specific tags (important for videos)
+                f"-TrackCreateDate={formatted_date}",
+                f"-TrackModifyDate={formatted_date}",
+                f"-MediaCreateDate={formatted_date}",
+                f"-MediaModifyDate={formatted_date}",
+            ]
+            cmd.extend(date_tags)
+            # Note: ExifTool might automatically adjust for timezone based on tag type,
+            # or write as UTC. Forcing a timezone offset requires more complex tag syntax.
+            # Using the UTC timestamp directly is usually the most reliable starting point.
+
+        # Add final options
+        cmd.extend([
+            "-overwrite_original", # Modify file in place
+            "-P",                  # Preserve original file modification time (of the media file itself)
+            str(media_path)        # The target media file
+        ])
+
         # Debug message goes to file, and console if verbose
         logger.debug(f"Running exiftool command: {' '.join(cmd)}")
 
         result = subprocess.run(cmd, capture_output=True, text=True, check=False, encoding='utf-8')
 
         if result.returncode == 0:
-            # Info message goes to file, and console if verbose
-            logger.info(f"Successfully embedded metadata into {media_path.name}")
-            if result.stdout and result.stdout.strip(): # Log output if any
-                 logger.debug(f"Exiftool output for {media_path.name}: {result.stdout.strip()}")
+            # Check stdout for common "1 image files updated" message
+            # Allow for "0 image files updated" if only non-standard tags existed in json
+            # or if the specific date tags were already correct. Focus on stderr for real errors.
+            if "1 image files updated" in result.stdout:
+                 # Info message goes to file, and console if verbose
+                logger.info(f"Successfully embedded metadata into {media_path.name}")
+            else:
+                # Log potentially unchanged files or other messages as debug info
+                logger.debug(f"Exiftool ran for {media_path.name}. Output: {result.stdout.strip()}")
+
+            # Also log warnings from stderr even on success (return code 0)
+            if result.stderr and result.stderr.strip():
+                # Filter out ignorable warnings if necessary, e.g., minor conformity warnings
+                # For now, log all stderr warnings
+                logger.warning(f"Exiftool potential warnings for {media_path.name}: {result.stderr.strip()}")
             return True
         else:
-            log_level = logging.ERROR if "Error" in result.stderr else logging.WARNING
+            # Log failures
+            log_level = logging.ERROR # Treat any non-zero exit code as error for simplicity
             # Warning/Error messages go to file, and console if verbose
             logger.log(log_level, f"Exiftool command failed for {media_path.name} (exit code {result.returncode})")
             if result.stdout and result.stdout.strip():
@@ -222,7 +286,6 @@ def embed_metadata(media_path: Path, json_path: Path, dry_run: bool):
         logger.error("Exiftool command not found. Please ensure exiftool is installed and in your system's PATH.")
         # Also print critical error to console always
         print("ERROR: Exiftool command not found. Please ensure exiftool is installed and in your system's PATH.", file=sys.stderr)
-        # Exit here might be too abrupt if called mid-loop, better to handle in main or return False
         return False # Indicate failure
     except subprocess.TimeoutExpired:
         logger.error(f"Exiftool command timed out for {media_path.name}")
