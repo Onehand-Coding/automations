@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
 import os
-import subprocess
-from datetime import datetime
-import argparse
-from dotenv import load_dotenv
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from pathlib import Path
-import shutil
-import logging
-import logging.handlers
 import sys
 import json # Needed for parsing rclone lsjson output
 import pickle # Needed for GDrive token
+import shutil
+import logging
+import argparse
+import subprocess
+import logging.handlers
+from pathlib import Path
+from datetime import datetime
+
+import smtplib
+from dotenv import load_dotenv
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+from helper.funcs import ROOT_DIR, DATA_DIR, LOG_DIR
 
 # --- Google Drive Upload Imports ---
 try:
@@ -31,17 +34,14 @@ except ImportError:
 # Load environment variables
 load_dotenv()
 
-# --- Define constants near the top ---
-SCRIPT_DIR = Path(__file__).parent
-ROOT_DIR = SCRIPT_DIR.parent
-CREDENTIALS_DIR = SCRIPT_DIR / "data/pg_backups" # Adjusted path slightly
+# --- Directory constants ---
+CREDENTIALS_DIR = DATA_DIR / "backup-tool"
 BACKUP_DB_DIR = CREDENTIALS_DIR / "db"
 DEFAULT_RCLONE_TARGET_DIR = "DB_Backups"
-LOG_DIR = ROOT_DIR / "logs"
 LOG_FILE = LOG_DIR / "backup_tool.log"
 # GDrive constants
-GDRIVE_TOKEN_FILE = CREDENTIALS_DIR / 'token.pickle' # Assume token in script dir
-GDRIVE_CREDS_FILE = CREDENTIALS_DIR / 'credentials.json' # Assume creds in script dir
+GDRIVE_TOKEN_FILE = CREDENTIALS_DIR / 'token.pickle' # Assume token in data dir
+GDRIVE_CREDS_FILE = CREDENTIALS_DIR / 'credentials.json' # Assume creds in data dir
 GDRIVE_SCOPES = ['https://www.googleapis.com/auth/drive.file']
 
 # --- Setup Logging ---
@@ -52,9 +52,6 @@ def setup_logging():
     # Prevent adding handlers multiple times if script is re-run in same process
     if not logger.hasHandlers():
         logger.setLevel(logging.INFO) # Set minimum level for logger
-
-        # Ensure log directory exists
-        LOG_DIR.mkdir(parents=True, exist_ok=True)
 
         # File Handler (Rotating)
         file_handler = logging.handlers.RotatingFileHandler(

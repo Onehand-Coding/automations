@@ -1,5 +1,6 @@
 import os
 import re
+import sys
 import shutil
 import logging
 from enum import Enum
@@ -10,10 +11,10 @@ from itertools import combinations, zip_longest
 
 from send2trash import send2trash
 
-from helper import get_folder_path, new_filepath, confirm, configure_logging
+from helper.funcs import LOG_FOLDER, get_folder_path, new_filepath, confirm, configure_logging
 
 # Constants
-LOG_FILE = Path(__file__).parents[1] / 'logs' / 'file_organizer_logs.txt'
+LOG_FILE = LOG_FOLDER / 'file_organizer.log'
 TO_REPLACE_PATTERN = re.compile(r'\[.*\]|\(.*\)')
 SPLIT_PATTERN = re.compile(r'\s+|[.,:_-]')
 
@@ -406,8 +407,12 @@ def main() -> None:
         print(f'Organizing files in {to_sort_path.name} ...')
         organizer.recursive_sort()
     else:
-        print("No sorting method selected. Exiting.")
+        print("Exiting, Please use 'yes' or 'no'.")
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("Script Interrupted.")
+        sys.exit()

@@ -171,9 +171,7 @@ def init_git_repo():
     try:
         print("Initializing Git repository...")
         subprocess.run(["git", "init"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        subprocess.run(["git", "add", "."], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        subprocess.run(["git", "commit", "-m", "Initial commit"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        print("Git repository initialized with initial commit.")
+        print("Git repository initialized.")
     except subprocess.CalledProcessError as e:
         print(f"Failed to initialize Git repository: {e}")
     except FileNotFoundError:

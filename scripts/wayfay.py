@@ -1,10 +1,10 @@
 import re
-import subprocess
 import sys
+import platform
+import subprocess
 from pathlib import Path
 from typing import List, Dict, Optional
-from helper.funcs import write_to_json, read_print_json, DATA_FOLDER
-import platform
+from helper.funcs import write_to_json, read_print_json, DATA_DIR
 
 def get_ssids() -> List[str]:
     """Get list of SSIDs of previous and present wifi connections of the device.
@@ -146,9 +146,6 @@ def save_wifi_data(wifi_data: List[Dict[str, str]], output_file: Path) -> None:
 
 def main() -> None:
     """Main function to retrieve and save wifi passwords."""
-    # Use a more standard location for data
-    data_folder = DATA_FOLDER
-    data_folder.mkdir(exist_ok=True)
 
     # Get SSIDs and passwords
     ssids = get_ssids()
@@ -160,7 +157,7 @@ def main() -> None:
     wifi_data = get_passwords(ssids)
 
     # Save data
-    wifi_data_file = data_folder / "wifi_passwords.json"
+    wifi_data_file = DATA_DIR / "wifi_passwords.json"
     save_wifi_data(wifi_data, wifi_data_file)
 
     # Display the saved data

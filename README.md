@@ -64,7 +64,7 @@ Here's a breakdown of the main scripts available in the `scripts/` directory:
 * **Purpose:** Quickly scaffolds a new Python project structure.
 * **Features:**
     * Creates a standard project layout including a main package directory, `__init__.py`, `main.py`, `setup.py`, `README.md`, `.gitignore`, and an empty `requirements.txt`.
-    * Initializes a Git repository with an initial commit.
+    * Initializes a Git repository.
     * Creates a Python virtual environment (`.venv`).
     * Generates a basic `.sublime-project` file with LSP settings (optional).
     * Optionally opens the created project in Sublime Text.

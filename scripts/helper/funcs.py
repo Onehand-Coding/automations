@@ -6,12 +6,12 @@ from datetime import datetime
 from typing import List, Dict, Any, Union, Optional, Callable
 
 # Create folders using pathlib, which handles errors gracefully
-ROOT_DIR = Path(__file__).parent.parent
-DATA_FOLDER = ROOT_DIR / "data"
-DATA_FOLDER.mkdir(exist_ok=True)
+ROOT_DIR = Path(__file__).parent.parent.parent
+DATA_DIR = ROOT_DIR / "data"
+DATA_DIR.mkdir(exist_ok=True)
 
-LOG_FOLDER = ROOT_DIR / "logs"
-LOG_FOLDER.mkdir(exist_ok=True)
+LOG_DIR = ROOT_DIR / "logs"
+LOG_DIR.mkdir(exist_ok=True)
 
 
 def confirm(question: str, /, *, choice: str = "(Y/n)", confirm_letter: str = 'y') -> bool:
@@ -104,7 +104,7 @@ def get_folder_path(task: str) -> Path:
     """
     print(f'Enter the absolute path for {task}')
     while True:
-        path = input('> ')
+        path = input('> ').strip()
         if path and Path(path).exists():
             return Path(path).absolute()
         print('Invalid path. Please enter a valid path!')

@@ -407,7 +407,7 @@ def main():
                 # Use print for interactive prompt, always shown on console
                 response = input("WARNING: You requested to delete JSON files after successful embedding.\n"
                                 "This action CANNOT be undone. Are you sure? (yes/no): ").lower().strip()
-                if response == 'yes':
+                if response in ('yes', 'y'):
                     confirm_delete = True
                     # Info goes to file, and console if verbose
                     logger.info("User confirmed JSON deletion.")
