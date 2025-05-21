@@ -3,6 +3,7 @@ import re
 import sys
 import shutil
 import logging
+import argparse
 from enum import Enum
 from pathlib import Path
 from typing import List, Dict, Set, Optional, Union, Tuple
@@ -11,20 +12,30 @@ from itertools import combinations, zip_longest
 
 from send2trash import send2trash
 
-from helper.funcs import LOG_FOLDER, get_folder_path, new_filepath, confirm, configure_logging
+from helper.funcs import LOG_DIR, get_folder_path, new_filepath
 
 # Constants
-LOG_FILE = LOG_FOLDER / 'file_organizer.log'
+LOG_FILE = LOG_DIR / 'file_organizer.log'
 TO_REPLACE_PATTERN = re.compile(r'\[.*\]|\(.*\)')
 SPLIT_PATTERN = re.compile(r'\s+|[.,:_-]')
 
+# --- Setup Logging ---
+log_handlers = [logging.StreamHandler(), logging.FileHandler(LOG_FILE, mode="w")]
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    handlers=log_handlers
+)
+logger = logging.getLogger(__name__)
 
-class FileType(Enum):
+
+class FileTypes(Enum):
     """Enum for different file types and their extensions."""
     VIDEO = (".mp4", ".mkv", ".webm", ".3gp")
     AUDIO = (".mp3", ".m4a", ".wav")
     IMAGE = (".jfif", ".jpg", ".png", ".jpeg", ".gif")
-    OFFICE = (".docx", ".xlsx", ".pptx", ".pdf", ".doc", ".xlsm", ".pub", ".odt")
+    OFFICE = (".docx", ".xlsx", ".pptx", ".pdf", ".doc", ".xlsm", ".pub", ".odt", ".pptm", ".ppsx")
     TEXT = (".html", ".css", ".js", ".py", ".txt", ".csv", ".json")
     ARCHIVE = (".zip", ".tar", ".7z", ".rar", ".gz")
 
@@ -56,7 +67,7 @@ class FileOrganizer:
         # Create mapping of file types to destination folders
         default_paths = {
             file_type: self.to_sort_path / f"{file_type.name.title()} files"
-            for file_type in FileType
+            for file_type in FileTypes
         }
 
         # Create a defaultdict that returns "Others" path for unknown extensions
@@ -121,7 +132,7 @@ class FileOrganizer:
         """
         # Handle case where destination is a file
         if dest.exists() and dest.is_file():
-            logging.debug('Destination folder has the same name as the file. Using file parent as destination...')
+            logger.debug('Destination folder has the same name as the file. Using file parent as destination...')
             dest = dest.parent
 
         # Create destination path and ensure destination folder exists
@@ -134,11 +145,11 @@ class FileOrganizer:
 
         # Move the file
         if not destination_file.exists():
-            logging.debug(f'Moving {file} to {dest}')
+            logger.debug(f'Moving {file} to {dest}')
             try:
                 shutil.move(str(file), str(destination_file))
             except FileNotFoundError:
-                logging.warning(f'Not moved: {file}, This file may be deleted.')
+                logger.warning(f'Not moved: {file}, This file may be deleted.')
 
     def type_sort(self) -> None:
         """Sort files by their type (extension)."""
@@ -224,34 +235,34 @@ class FileOrganizer:
         unsorted_files = self.get_files(self.to_sort_path)
         existing_folders = set(self.to_sort_path.glob('*/'))
 
-        logging.info('Running simple sort...')
+        logger.info('Running simple sort...')
         # Sort by extension
         for file in unsorted_files:
             ext_name = file.suffix.strip(".") if file.suffix else "unknown"
             ext_dest = file.parent / f"{ext_name} files"
             self.move_file(file, ext_dest)
 
-        logging.info('Running prefix_sort...')
+        logger.info('Running prefix_sort...')
         # Sort by prefix in newly created folders
         new_folders = set(self.to_sort_path.glob('*/')) - existing_folders
         for folder in new_folders:
             self.prefix_sort(folder)
 
-        logging.info('Verifying files...')
+        logger.info('Verifying files...')
         verify_files(unsorted_files, self.get_files(self.to_sort_path), method='Simple')
 
     def recursive_sort(self) -> None:
         """Perform a recursive sort by type, prefix, and stem."""
         unsorted_files = self.get_files()
 
-        logging.info('Running type_sort...')
+        logger.info('Running type_sort...')
         self.type_sort()
 
-        logging.info('Running prefix_sort...')
+        logger.info('Running prefix_sort...')
         for folder in self.get_folders():
             self.prefix_sort(folder)
 
-        logging.info('Running stem_sort...')
+        logger.info('Running stem_sort...')
         for folder in self.get_folders():
             self.stem_sort(folder)
 
@@ -259,19 +270,18 @@ class FileOrganizer:
         empty_folders = set(self.get_folders()) - self.destination_folders
         remove_folders(empty_folders)
 
-        logging.info('Verifying files...')
+        logger.info('Verifying files...')
         verify_files(unsorted_files, self.get_files(), empty_folders, method='Aggressive')
 
 
-def verify_files(unsorted_files: List[Path], sorted_files: List[Path],
-                empty_folders: Optional[Set[Path]] = None, *, method: str = '') -> None:
+def verify_files(unsorted_files: List[Path], sorted_files: List[Path], empty_folders: Optional[Set[Path]] = None, *, method: str = '') -> None:
     """Verify that all files were correctly sorted.
 
     Args:
         unsorted_files: List of files before sorting
         sorted_files: List of files after sorting
         empty_folders: Set of empty folders that were removed
-        method: Method name used for sorting (for logging)
+        method: Method name used for sorting (for logger)
     """
     if empty_folders is None:
         empty_folders = set()
@@ -281,13 +291,13 @@ def verify_files(unsorted_files: List[Path], sorted_files: List[Path],
     sorted_filenames = {file.name for file in sorted_files}
 
     if len(unsorted_filenames) == len(sorted_filenames):
-        logging.info(f"{method} file organization successful!")
+        logger.info(f"{method} file organization successful!")
         return
 
     # Find files that were accidentally deleted
     removed_filenames = unsorted_filenames - sorted_filenames
     if removed_filenames:
-        logging.error("Files were included during folder deletion!")
+        logger.error("Files were included during folder deletion!")
         for filename in removed_filenames:
             try:
                 # Find the original file and the folder it was in
@@ -296,9 +306,9 @@ def verify_files(unsorted_files: List[Path], sorted_files: List[Path],
                     folder.name for folder in empty_folders
                     if any(part in original_file.parts for part in folder.parts)
                 )
-                logging.error(f'Deleted file: {filename} from Folder: {deleted_folder}')
+                logger.error(f'Deleted file: {filename} from Folder: {deleted_folder}')
             except (StopIteration, IndexError):
-                logging.error(f'Deleted file: {filename}, unable to determine containing folder')
+                logger.error(f'Deleted file: {filename}, unable to determine containing folder')
 
 
 def remove_folders(folders: Set[Path]) -> None:
@@ -310,13 +320,13 @@ def remove_folders(folders: Set[Path]) -> None:
     if not folders:
         return
 
-    logging.info('Moving empty folders to trash...')
+    logger.info('Moving empty folders to trash...')
     for folder in folders:
-        logging.debug(f'Moving {folder} to trash...')
+        logger.debug(f'Moving {folder} to trash...')
         try:
             send2trash(str(folder))
         except Exception as e:
-            logging.error(f"Error removing folder {folder}: {e}")
+            logger.error(f"Error removing folder {folder}: {e}")
 
 
 def split_stem(split_pattern: re.Pattern, stem: str) -> List[str]:
@@ -392,22 +402,30 @@ def get_common_stems(files: List[Path]) -> List[List[str]]:
 
 def main() -> None:
     """Main function to run the file organizer."""
-    # Configure logging
-    configure_logging(log_level=logging.INFO, log_file=LOG_FILE)
+
+    parser = argparse.ArgumentParser(
+        description="File Organizer tool with simple and agressive file sorting method.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    parser.add_argument("folder_path", help="Absolute path for folder you wish to organize the files from.")
+    parser.add_argument("--method", "-m", choices=["simple", "agressive"], help="Sorting method to use", default= "agressive")
+
+    args = parser.parse_args()
+
+    #Set the default sorting method to agressive if not specified.
+    if not args.method:
+        args.method = "agressive"
+    logger.info(f"Starting File organizer tool using '{args.method}' method.")
 
     # Get path to sort
-    to_sort_path = get_folder_path(task="folder you want to organize files from")
-    organizer = FileOrganizer(to_sort_path)
+    folder_path = args.folder_path
+    organizer = FileOrganizer(folder_path)
 
-    # Ask user for sort method
-    if confirm("Simple sort?", choice='(yes/no)', confirm_letter="yes"):
-        print(f'Organizing files in {to_sort_path.name} ...')
-        organizer.simple_sort()
-    elif confirm("Aggressive sort?", choice='(yes/no)', confirm_letter="yes"):
-        print(f'Organizing files in {to_sort_path.name} ...')
+    # Get sorting method
+    if args.method == "agressive":
         organizer.recursive_sort()
-    else:
-        print("Exiting, Please use 'yes' or 'no'.")
+    elif args.method == "simple":
+        organizer.simple_sort()
 
 
 if __name__ == "__main__":

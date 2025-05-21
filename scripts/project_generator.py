@@ -7,12 +7,26 @@ This script creates a new Python project with all necessary files and initialize
 
 import os
 import sys
+import logging
 import argparse
 import subprocess
 import venv
 from pathlib import Path
 
+from helper.funcs import LOG_DIR
+
 DEFAULT_PROJECTS_DIR = os.path.join(os.getenv("DEFAULT_PROJECTS_DIR", os.path.expanduser("~/Coding")), "projects")
+LOG_FILE = LOG_DIR / 'project_generator.log'
+
+# Configure logging
+log_handlers = [logging.StreamHandler(), logging.FileHandler(LOG_FILE, mode="w")]
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    handlers=log_handlers
+)
+logger = logging.getLogger(__name__)
 
 
 def open_in_sublime(project_path):
@@ -21,11 +35,11 @@ def open_in_sublime(project_path):
         project_name = os.path.basename(project_path)
         sublime_project = os.path.join(project_path, ".sublime-workspace", f"{project_name}.sublime-project")
         subprocess.run(["subl", "--project", sublime_project], check=True)
-        print("Opened project in Sublime Text")
+        logger.info("Opened project in Sublime Text")
     except subprocess.CalledProcessError as e:
-        print(f"Failed to open Sublime Text: {e}")
+        logger.error(f"Failed to open Sublime Text: {e}")
     except FileNotFoundError:
-        print("Sublime Text is not installed or not in PATH")
+        logger.error("Sublime Text is not installed or not in PATH")
 
 
 def create_project_structure(project_name, project_path):
@@ -161,21 +175,21 @@ coverage.xml
 
 def create_virtual_env():
     """Create a virtual environment in the project directory."""
-    print("Creating virtual environment...")
+    logger.info("Creating virtual environment...")
     venv.create(".venv", with_pip=True)
-    print("Virtual environment created at .venv/")
+    logger.info("Virtual environment created at .venv/")
 
 
 def init_git_repo():
     """Initialize a Git repository in the project directory."""
     try:
-        print("Initializing Git repository...")
+        logger.info("Initializing Git repository...")
         subprocess.run(["git", "init"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        print("Git repository initialized.")
+        logger.info("Git repository initialized.")
     except subprocess.CalledProcessError as e:
-        print(f"Failed to initialize Git repository: {e}")
+        logger.error(f"Failed to initialize Git repository: {e}")
     except FileNotFoundError:
-        print("Git is not installed or not in PATH. Please install Git to initialize the repository.")
+        logger.error("Git is not installed or not in PATH. Please install Git to initialize the repository.")
 
 
 def main():
@@ -195,7 +209,7 @@ def main():
 
     # Validate project name
     if not project_name:
-        print("Project name cannot be empty.")
+        logger.error("Project name cannot be empty.")
         sys.exit(1)
 
     # Determine project path
@@ -206,11 +220,11 @@ def main():
     if os.path.exists(full_project_path):
         response = input(f"Directory '{full_project_path}' already exists. Overwrite? (y/N): ").lower()
         if response != 'y':
-            print("Project creation cancelled.")
+            logger.info("Project creation cancelled.")
             sys.exit(1)
 
     # Create project files
-    print(f"Creating project '{project_name}' in {project_path}...")
+    logger.info(f"Creating project '{project_name}' in {project_path}...")
     create_project_structure(project_name, project_path)
 
     # Create virtual environment
@@ -224,14 +238,14 @@ def main():
 
     # Print success message
     current_dir = os.path.abspath(os.curdir)
-    print(f"\nProject '{project_name}' created successfully at {current_dir}")
-    print(f"\nPackage name: {package_name}")
-    print("\nNext steps:")
-    print(f"1. cd {full_project_path}")
-    print("2. Activate the virtual environment:")
-    print("   - On Linux/macOS: source .venv/bin/activate")
-    print("   - On Windows: .venv\\Scripts\\activate")
-    print("3. Install the package in development mode: pip install -e .")
+    logger.info(f"\nProject '{project_name}' created successfully at {current_dir}")
+    logger.info(f"\nPackage name: {package_name}")
+    logger.info("\nNext steps:")
+    logger.info(f"1. cd {full_project_path}")
+    logger.info("2. Activate the virtual environment:")
+    logger.info("   - On Linux/macOS: source .venv/bin/activate")
+    logger.info("   - On Windows: .venv\\Scripts\\activate")
+    logger.info("3. Install the package in development mode: pip install -e .")
 
     # Handle Sublime Text opening
     if not args.no_open:

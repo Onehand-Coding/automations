@@ -55,8 +55,7 @@ Here's a breakdown of the main scripts available in the `scripts/` directory:
     * Uses a `helper` module for common functions.
 * **Usage:**
     ```bash
-    python scripts/file_organizer.py
-    # Follow prompts to select directory and sort type (Simple/Aggressive)
+    python scripts/file_organizer.py /path/to/organize --method [agressive|simple] # Deefault is agressive
     ```
 
 ### 4. Python Project Generator (`project_generator.py`)
