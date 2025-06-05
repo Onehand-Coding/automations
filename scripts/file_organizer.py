@@ -12,22 +12,13 @@ from itertools import combinations, zip_longest
 
 from send2trash import send2trash
 
-from helper.funcs import LOG_DIR, get_folder_path, new_filepath
+from helper import get_folder_path, new_filepath, setup_logging
 
 # Constants
-LOG_FILE = LOG_DIR / 'file_organizer.log'
 TO_REPLACE_PATTERN = re.compile(r'\[.*\]|\(.*\)')
 SPLIT_PATTERN = re.compile(r'\s+|[.,:_-]')
 
-# --- Setup Logging ---
-log_handlers = [logging.StreamHandler(), logging.FileHandler(LOG_FILE, mode="w")]
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-    handlers=log_handlers
-)
-logger = logging.getLogger(__name__)
+logger = setup_logging(log_file="file_organizer.log")
 
 
 class FileTypes(Enum):
@@ -290,10 +281,6 @@ def verify_files(unsorted_files: List[Path], sorted_files: List[Path], empty_fol
     unsorted_filenames = {file.name for file in unsorted_files}
     sorted_filenames = {file.name for file in sorted_files}
 
-    if len(unsorted_filenames) == len(sorted_filenames):
-        logger.info(f"{method} file organization successful!")
-        return
-
     # Find files that were accidentally deleted
     removed_filenames = unsorted_filenames - sorted_filenames
     if removed_filenames:
@@ -306,9 +293,15 @@ def verify_files(unsorted_files: List[Path], sorted_files: List[Path], empty_fol
                     folder.name for folder in empty_folders
                     if any(part in original_file.parts for part in folder.parts)
                 )
-                logger.error(f'Deleted file: {filename} from Folder: {deleted_folder}')
+                logger.warning(f'Deleted file: {filename} from Folder: {deleted_folder}')
             except (StopIteration, IndexError):
-                logger.error(f'Deleted file: {filename}, unable to determine containing folder')
+                logger.warning(f'Deleted file: {filename}, unable to determine containing folder')
+
+        logger.error(f"{method.title()} sorting finished with error! {len(removed_filenames)} were accidentally deleted, check your trash bin.")
+
+    if len(unsorted_filenames) == len(sorted_filenames):
+        logger.info("File verification Done! No accidental deletion occured.")
+        logger.info(f"{method} file organization successful!")
 
 
 def remove_folders(folders: Set[Path]) -> None:
@@ -402,7 +395,6 @@ def get_common_stems(files: List[Path]) -> List[List[str]]:
 
 def main() -> None:
     """Main function to run the file organizer."""
-
     parser = argparse.ArgumentParser(
         description="File Organizer tool with simple and agressive file sorting method.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter

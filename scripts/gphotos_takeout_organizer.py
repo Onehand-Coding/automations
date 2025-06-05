@@ -13,12 +13,11 @@ from stat import S_ISREG # Needed for the OSError handling refinement
 from datetime import datetime
 from datetime import datetime, timezone
 
+from helper import LOG_DIR
 # --- Constants ---
 SUPPORTED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".heic", ".bmp", ".tiff", ".tif"}
 SUPPORTED_VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".wmv", ".mkv", ".webm", ".mpg", ".mpeg", ".3gp"}
 SUPPORTED_MEDIA_EXTENSIONS = SUPPORTED_IMAGE_EXTENSIONS.union(SUPPORTED_VIDEO_EXTENSIONS)
-LOG_DIR = Path(__file__).parent.parent / "logs"
-LOG_DIR.mkdir(exist_ok=True)
 LOG_FILENAME = LOG_DIR / "metadata_embedder.log"
 
 # --- Logging Setup ---

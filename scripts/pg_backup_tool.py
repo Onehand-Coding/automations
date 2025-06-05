@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-from helper.funcs import ROOT_DIR, DATA_DIR, LOG_DIR
+from helper import ROOT_DIR, DATA_DIR, setup_logging
 
 # --- Google Drive Upload Imports ---
 try:
@@ -38,42 +38,13 @@ load_dotenv()
 CREDENTIALS_DIR = DATA_DIR / "backup-tool"
 BACKUP_DB_DIR = CREDENTIALS_DIR / "db"
 DEFAULT_RCLONE_TARGET_DIR = "DB_Backups"
-LOG_FILE = LOG_DIR / "backup_tool.log"
+
 # GDrive constants
 GDRIVE_TOKEN_FILE = CREDENTIALS_DIR / 'token.pickle' # Assume token in data dir
 GDRIVE_CREDS_FILE = CREDENTIALS_DIR / 'credentials.json' # Assume creds in data dir
 GDRIVE_SCOPES = ['https://www.googleapis.com/auth/drive.file']
 
-# --- Setup Logging ---
-def setup_logging():
-    """Configures logging to file and console."""
-    log_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-    logger = logging.getLogger() # Get root logger
-    # Prevent adding handlers multiple times if script is re-run in same process
-    if not logger.hasHandlers():
-        logger.setLevel(logging.INFO) # Set minimum level for logger
-
-        # File Handler (Rotating)
-        file_handler = logging.handlers.RotatingFileHandler(
-            LOG_FILE, maxBytes=5*1024*1024, backupCount=5, encoding='utf-8'
-        )
-        file_handler.setFormatter(log_formatter)
-        file_handler.setLevel(logging.DEBUG) # Log DEBUG level and above to file
-
-        # Console Handler
-        console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setFormatter(log_formatter)
-        console_handler.setLevel(logging.INFO) # Log INFO level and above to console
-
-        # Add handlers to the logger
-        logger.addHandler(file_handler)
-        logger.addHandler(console_handler)
-
-    # Get logger specific to this module
-    module_logger = logging.getLogger(__name__)
-    return module_logger
-
-logger = setup_logging()
+logger = setup_logging(log_file="backup_tool.log")
 
 # --- Rclone Helper Functions ---
 def check_rclone():

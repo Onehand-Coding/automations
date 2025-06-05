@@ -13,20 +13,11 @@ import subprocess
 import venv
 from pathlib import Path
 
-from helper.funcs import LOG_DIR
+from helper import confirm, setup_logging
 
 DEFAULT_PROJECTS_DIR = os.path.join(os.getenv("DEFAULT_PROJECTS_DIR", os.path.expanduser("~/Coding")), "projects")
-LOG_FILE = LOG_DIR / 'project_generator.log'
 
-# Configure logging
-log_handlers = [logging.StreamHandler(), logging.FileHandler(LOG_FILE, mode="w")]
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-    handlers=log_handlers
-)
-logger = logging.getLogger(__name__)
+logger = setup_logging(log_file="project_generator.log")
 
 
 def open_in_sublime(project_path):
@@ -106,47 +97,24 @@ setup(
 
     # Create .gitignore
     with open(".gitignore", "w") as f:
-        f.write('''# Byte-compiled / optimized / DLL files
+        f.write('''# Default ignored
 __pycache__/
-*.py[cod]
-*$py.class
-
-# Distribution / packaging
-dist/
-build/
-*.egg-info/
-
-# Virtual environments
 .venv/
-venv/
-ENV/
-
-# IDE specific files
-.idea/
-.vscode/
+logs/
 *.sublime-*
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.coverage
-.coverage.*
-.cache
-coverage.xml
-*.cover
 ''')
 
     # Create directory for sublime project files
     os.makedirs(".sublime-workspace", exist_ok=True)
 
-    # Create .sublime-project file with LSP settings
+    # Create .sublime-project file with LSP settings and build system
     sublime_project_path = os.path.join(".sublime-workspace", f"{project_name}.sublime-project")
     with open(sublime_project_path, "w") as f:
-        project_path = os.path.abspath(".")
+        project_path_abs = os.path.abspath(".")
         f.write(f'''{{
     "folders": [
         {{
-            "path": "{project_path}"
+            "path": "{project_path_abs}"
         }}
     ],
     "settings": {{
@@ -154,14 +122,30 @@ coverage.xml
             "LSP-pyright": {{
                 "settings": {{
                     "python": {{
-                        "pythonPath": "{project_path}/.venv/bin/python",
-                        "venvPath": "{project_path}",
+                        "pythonPath": "{project_path_abs}/.venv/bin/python",
+                        "venvPath": "{project_path_abs}",
                         "venv": ".venv"
                     }}
                 }}
             }}
         }}
-    }}
+    }},
+    "build_systems": [
+        {{
+            "name": "{project_name}",
+            "target": "terminus_exec",
+            "cancel": "terminus_cancel_build",
+            "title": "{project_name}",
+            "auto_close": false,
+            "focus": true,
+            "timeit": false,
+            "shell_cmd": "{project_path_abs}/.venv/bin/python -u \\"$file\\"",
+            "file_regex": "^[ ]*File \\"(...*?)\\", line ([0-9]*)",
+            "working_dir": "${{file_path}}",
+            "selector": "source.python",
+            "file_patterns": ["*.py"],
+        }}
+    ]
 }}''')
 
     # Create requirements.txt (initial empty)
@@ -218,8 +202,7 @@ def main():
 
     full_project_path = os.path.join(project_path, project_name)
     if os.path.exists(full_project_path):
-        response = input(f"Directory '{full_project_path}' already exists. Overwrite? (y/N): ").lower()
-        if response != 'y':
+        if not confirm(f"Directory '{full_project_path}' already exists. Overwrite?"):
             logger.info("Project creation cancelled.")
             sys.exit(1)
 
@@ -252,8 +235,7 @@ def main():
         if args.open:
             open_in_sublime(full_project_path)
         else:
-            response = input("\nOpen project in Sublime Text? [y/N]: ").lower()
-            if response == 'y':
+            if confirm("\nOpen project in Sublime Text?"):
                 open_in_sublime(full_project_path)
 
 

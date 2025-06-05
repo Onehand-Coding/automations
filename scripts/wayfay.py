@@ -4,7 +4,8 @@ import platform
 import subprocess
 from pathlib import Path
 from typing import List, Dict, Optional
-from helper.funcs import write_to_json, read_print_json, DATA_DIR
+
+from helper import write_to_json, read_print_json, DATA_DIR
 
 def get_ssids() -> List[str]:
     """Get list of SSIDs of previous and present wifi connections of the device.

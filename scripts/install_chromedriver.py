@@ -8,34 +8,24 @@ and downloads the appropriate ChromeDriver to match.
 Usage: sudo python3 install_chromedriver.py [--force] [--browser chrome|brave|chromium] [--dry-run]
 """
 
-import argparse
-import json
-import logging
 import os
-import platform
 import re
-import shutil
-import subprocess
 import sys
-import tempfile
-import urllib.request
+import json
+import shutil
+import logging
 import zipfile
+import platform
+import argparse
+import tempfile
+import subprocess
+import urllib.request
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from helper.funcs import LOG_DIR
+from helper import setup_logging
 
-LOG_FILE = LOG_DIR / 'chromedriver_installer.log'
-
-# Configure logging
-log_handlers = [logging.StreamHandler(), logging.FileHandler(LOG_FILE, mode="w")]
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-    handlers=log_handlers
-)
-logger = logging.getLogger(__name__)
+logger = setup_logging(log_file="chromedriver_installer.log")
 
 
 class ChromeDriverInstaller:

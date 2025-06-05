@@ -5,16 +5,8 @@ from pathlib import Path
 from datetime import datetime
 from typing import List, Dict, Any, Union, Optional, Callable
 
-# Create folders using pathlib, which handles errors gracefully
-ROOT_DIR = Path(__file__).parent.parent.parent
-DATA_DIR = ROOT_DIR / "data"
-DATA_DIR.mkdir(exist_ok=True)
 
-LOG_DIR = ROOT_DIR / "logs"
-LOG_DIR.mkdir(exist_ok=True)
-
-
-def confirm(question: str, /, *, choice: str = "(Y/n)", confirm_letter: str = 'y') -> bool:
+def confirm(question: str, /, *, choice: str = "[Y/N] :", confirm_letter: str = 'y') -> bool:
     """Prompt user for confirmation.
 
     Args:
@@ -210,24 +202,3 @@ def read_csv_list_output(csv_file: Union[str, Path], *, delimiter: str = ',') ->
         print()
         for row in csv_reader:
             print(*row)
-
-
-def configure_logging(*, log_level: int = logging.DEBUG, log_file: Optional[Union[str, Path]] = None,
-                    log_format: str = "%(asctime)s - %(levelname)s - %(message)s",
-                    file_mode: str = 'w') -> None:
-    """Configure logging with specified parameters.
-
-    Args:
-        log_level: Logging level (e.g., logging.DEBUG)
-        log_file: Path to the log file
-        log_format: Format string for log messages
-        file_mode: File mode for opening the log file
-    """
-    log_handlers = [logging.StreamHandler() if log_file is None
-                    else logging.FileHandler(log_file, mode=file_mode)]
-
-    logging.basicConfig(
-        level=log_level,
-        handlers=log_handlers,
-        format=log_format,
-    )
