@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-WireGuard Configuration Activator
-A simple script to activate WireGuard configurations with interactive selection.
+WireGuard Configuration Activator - Improved Version
+A robust script to activate WireGuard configurations with better status detection.
 """
 
 import os
@@ -46,29 +46,58 @@ class WireGuardActivator:
         self.logger.info(f"Available configurations: {', '.join(config_names)}")
         return True
 
+    def check_interface_status(self, interface_name):
+        """Check if a WireGuard interface is active using multiple methods."""
+        self.logger.debug(f"Checking status for interface: {interface_name}")
+
+        # Method 1: Check with wg command
+        try:
+            result = subprocess.run(['sudo', 'wg', 'show', interface_name],
+                                  capture_output=True, text=True, timeout=5)
+            if result.returncode == 0 and result.stdout.strip():
+                self.logger.debug(f"wg show successful for {interface_name}")
+                return "🟢 ACTIVE", result.stdout.strip()
+        except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+            self.logger.debug(f"wg command failed for {interface_name}: {e}")
+
+        # Method 2: Check network interfaces
+        try:
+            result = subprocess.run(['ip', 'link', 'show', interface_name],
+                                  capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                if "UP" in result.stdout and "LOWER_UP" in result.stdout:
+                    self.logger.debug(f"Interface {interface_name} is UP via ip command")
+                    return "🟡 UP (No WG Data)", None
+                elif "UP" in result.stdout:
+                    return "🟠 UP (Link Down)", None
+        except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+            self.logger.debug(f"ip command failed for {interface_name}: {e}")
+
+        # Method 3: Check with systemctl (if using systemd)
+        try:
+            result = subprocess.run(['systemctl', 'is-active', f'wg-quick@{interface_name}'],
+                                  capture_output=True, text=True, timeout=5)
+            if result.returncode == 0 and result.stdout.strip() == "active":
+                self.logger.debug(f"systemd service active for {interface_name}")
+                return "🟢 ACTIVE (systemd)", None
+        except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+            self.logger.debug(f"systemctl command failed for {interface_name}: {e}")
+
+        return "⚪ INACTIVE", None
+
     def display_configs(self):
-        """Display available configurations."""
+        """Display available configurations with improved status detection."""
         self.logger.debug("Displaying configuration menu")
         print("\nAvailable WireGuard Configurations:")
-        print("-" * 40)
+        print("-" * 60)
+
         for i, config in enumerate(self.configs, 1):
-            # Get interface name (filename without .conf)
             interface_name = config.stem
-
-            # Check if interface is currently active
-            try:
-                result = subprocess.run(['wg', 'show', interface_name],
-                                      capture_output=True, text=True)
-                status = "🟢 ACTIVE" if result.returncode == 0 else "⚪ INACTIVE"
-                self.logger.debug(f"Interface {interface_name} status: {status}")
-            except FileNotFoundError:
-                status = "❓ UNKNOWN (wg tool not found)"
-                self.logger.warning("wg command not found - cannot determine interface status")
-
+            status, wg_info = self.check_interface_status(interface_name)
             print(f"{i:2d}. {interface_name:<20} {status}")
 
         print(f"\n 0. Exit")
-        print("-" * 40)
+        print("-" * 60)
 
     def get_user_choice(self):
         """Get user's configuration choice."""
@@ -100,67 +129,90 @@ class WireGuardActivator:
                 return None
 
     def activate_config(self, config_path):
-        """Activate the selected WireGuard configuration."""
+        """Activate the selected WireGuard configuration with improved error handling."""
         interface_name = config_path.stem
 
         self.logger.info(f"Attempting to activate WireGuard interface: {interface_name}")
         print(f"\nActivating WireGuard interface: {interface_name}")
 
         try:
-            # First, try to bring down any existing interface
-            self.logger.debug(f"Attempting to bring down existing interface: {interface_name}")
-            down_result = subprocess.run(['sudo', 'wg-quick', 'down', interface_name],
-                          capture_output=True, text=True)
+            # First, deactivate any currently active interfaces
+            self.logger.debug("Deactivating any existing WireGuard interfaces")
+            self.deactivate_all(quiet=True)
 
-            if down_result.returncode == 0:
-                self.logger.debug(f"Successfully brought down interface: {interface_name}")
-            else:
-                self.logger.debug(f"Interface {interface_name} was not active or failed to bring down")
+            # Wait a moment for cleanup
+            import time
+            time.sleep(1)
 
             # Activate the selected configuration
             self.logger.debug(f"Bringing up interface: {interface_name}")
             result = subprocess.run(['sudo', 'wg-quick', 'up', interface_name],
-                                  capture_output=True, text=True)
+                                  capture_output=True, text=True, timeout=30)
 
             if result.returncode == 0:
                 success_msg = f"Successfully activated {interface_name}"
                 self.logger.info(success_msg)
                 print(f"✅ {success_msg}")
 
-                # Show connection status
-                status_result = subprocess.run(['wg', 'show', interface_name],
-                                             capture_output=True, text=True)
-                if status_result.returncode == 0 and status_result.stdout.strip():
-                    self.logger.debug(f"Interface status:\n{status_result.stdout}")
-                    print(f"\nConnection Status:")
-                    print(status_result.stdout)
-                else:
-                    status_msg = f"Interface {interface_name} is up but no peers connected yet."
-                    self.logger.info(status_msg)
-                    print(status_msg)
+                # Wait a moment for interface to fully initialize
+                time.sleep(2)
+
+                # Show detailed connection status
+                self.show_interface_details(interface_name)
 
             else:
                 error_msg = f"Failed to activate {interface_name}"
                 self.logger.error(f"{error_msg}. Return code: {result.returncode}")
+                print(f"❌ {error_msg}")
+
                 if result.stderr:
                     self.logger.error(f"stderr: {result.stderr}")
-                print(f"❌ {error_msg}")
-                if result.stderr:
-                    print(f"Error: {result.stderr}")
+                    print(f"Error details: {result.stderr}")
+                if result.stdout:
+                    self.logger.debug(f"stdout: {result.stdout}")
+                    print(f"Output: {result.stdout}")
 
+        except subprocess.TimeoutExpired:
+            error_msg = f"Timeout while activating {interface_name}"
+            self.logger.error(error_msg)
+            print(f"❌ {error_msg}")
         except FileNotFoundError as e:
             error_msg = "wg-quick command not found. Please install WireGuard."
             self.logger.error(f"{error_msg} Exception: {e}")
             print(f"❌ Error: {error_msg}")
-        except subprocess.CalledProcessError as e:
-            error_msg = f"Error executing command: {e}"
+        except Exception as e:
+            error_msg = f"Unexpected error: {e}"
             self.logger.error(error_msg)
             print(f"❌ {error_msg}")
 
-    def deactivate_all(self):
+    def show_interface_details(self, interface_name):
+        """Show detailed information about a specific interface."""
+        print(f"\n📊 Interface Details for {interface_name}:")
+        print("=" * 50)
+
+        # Check with multiple methods
+        methods = [
+            ("WireGuard Status", ['sudo', 'wg', 'show', interface_name]),
+            ("Network Interface", ['ip', 'addr', 'show', interface_name]),
+            ("Routing Info", ['ip', 'route', 'show', 'dev', interface_name]),
+        ]
+
+        for method_name, command in methods:
+            try:
+                result = subprocess.run(command, capture_output=True, text=True, timeout=10)
+                if result.returncode == 0 and result.stdout.strip():
+                    print(f"\n{method_name}:")
+                    print(result.stdout.strip())
+                else:
+                    print(f"\n{method_name}: No data available")
+            except Exception as e:
+                print(f"\n{method_name}: Error - {e}")
+
+    def deactivate_all(self, quiet=False):
         """Deactivate all active WireGuard interfaces."""
-        self.logger.info("Starting deactivation of all WireGuard interfaces")
-        print("\nDeactivating all WireGuard interfaces...")
+        if not quiet:
+            self.logger.info("Starting deactivation of all WireGuard interfaces")
+            print("\nDeactivating all WireGuard interfaces...")
 
         deactivated_count = 0
         for config in self.configs:
@@ -168,18 +220,20 @@ class WireGuardActivator:
             try:
                 self.logger.debug(f"Attempting to deactivate interface: {interface_name}")
                 result = subprocess.run(['sudo', 'wg-quick', 'down', interface_name],
-                                      capture_output=True, text=True)
+                                      capture_output=True, text=True, timeout=15)
                 if result.returncode == 0:
                     success_msg = f"Deactivated {interface_name}"
                     self.logger.info(success_msg)
-                    print(f"✅ {success_msg}")
+                    if not quiet:
+                        print(f"✅ {success_msg}")
                     deactivated_count += 1
                 else:
                     self.logger.debug(f"Interface {interface_name} was not active or failed to deactivate")
             except Exception as e:
                 self.logger.error(f"Error deactivating {interface_name}: {e}")
 
-        self.logger.info(f"Deactivation complete. {deactivated_count} interfaces deactivated.")
+        if not quiet:
+            self.logger.info(f"Deactivation complete. {deactivated_count} interfaces deactivated.")
 
     def show_menu(self):
         """Show additional menu options."""
@@ -187,6 +241,7 @@ class WireGuardActivator:
         print("d. Deactivate all interfaces")
         print("r. Refresh/reload configurations")
         print("s. Show current status")
+        print("t. Test connectivity")
         print("q. Quit")
 
         choice = input("\nChoose an option (or number to activate): ").strip().lower()
@@ -194,88 +249,174 @@ class WireGuardActivator:
         return choice
 
     def show_status(self):
-        """Show status of all WireGuard interfaces."""
-        self.logger.debug("Displaying WireGuard status")
-        print("\nWireGuard Status:")
-        print("=" * 50)
+        """Show comprehensive status of all WireGuard interfaces."""
+        self.logger.debug("Displaying comprehensive WireGuard status")
+        print("\n🔍 Comprehensive WireGuard Status:")
+        print("=" * 60)
 
+        # Method 1: Try wg show all
+        print("\n1. WireGuard Interface Status:")
         try:
-            result = subprocess.run(['wg', 'show'], capture_output=True, text=True)
+            result = subprocess.run(['sudo', 'wg', 'show', 'all'],
+                                  capture_output=True, text=True, timeout=10)
             if result.returncode == 0:
                 if result.stdout.strip():
-                    self.logger.debug("WireGuard status retrieved successfully")
                     print(result.stdout)
                 else:
-                    status_msg = "No active WireGuard interfaces."
-                    self.logger.info(status_msg)
-                    print(status_msg)
+                    print("   No active WireGuard interfaces found.")
             else:
-                error_msg = "Failed to get WireGuard status."
-                self.logger.error(f"{error_msg} Return code: {result.returncode}")
-                print(error_msg)
-        except FileNotFoundError:
-            error_msg = "wg command not found. Please install WireGuard tools."
-            self.logger.error(error_msg)
-            print(error_msg)
+                print(f"   Error getting WireGuard status (code: {result.returncode})")
+                if result.stderr:
+                    print(f"   Error: {result.stderr}")
+        except Exception as e:
+            print(f"   Error: {e}")
 
-    def run(self):
-        """Main application loop."""
-        self.logger.info("WireGuard Configuration Activator started")
-        print("WireGuard Configuration Activator")
+        # Method 2: Check all network interfaces
+        print("\n2. Network Interface Status:")
+        try:
+            result = subprocess.run(['ip', 'link', 'show'],
+                                  capture_output=True, text=True, timeout=10)
+            if result.returncode == 0:
+                wg_interfaces = [line for line in result.stdout.split('\n')
+                               if any(config.stem in line for config in self.configs)]
+                if wg_interfaces:
+                    for line in wg_interfaces:
+                        print(f"   {line.strip()}")
+                else:
+                    print("   No WireGuard network interfaces found.")
+        except Exception as e:
+            print(f"   Error: {e}")
+
+        # Method 3: Individual interface check
+        print("\n3. Individual Interface Status:")
+        for config in self.configs:
+            interface_name = config.stem
+            status, _ = self.check_interface_status(interface_name)
+            print(f"   {interface_name:<15} {status}")
+
+    def test_connectivity(self):
+        """Test connectivity through active WireGuard interfaces."""
+        print("\n🌐 Testing Connectivity:")
         print("=" * 40)
 
+        # Find active interfaces
+        active_interfaces = []
+        for config in self.configs:
+            interface_name = config.stem
+            status, _ = self.check_interface_status(interface_name)
+            if "ACTIVE" in status or "UP" in status:
+                active_interfaces.append(interface_name)
+
+        if not active_interfaces:
+            print("No active WireGuard interfaces found.")
+            return
+
+        print(f"Active interfaces: {', '.join(active_interfaces)}")
+
+        # Test connectivity
+        test_hosts = ["8.8.8.8", "1.1.1.1", "google.com"]
+
+        for host in test_hosts:
+            try:
+                print(f"\nTesting connectivity to {host}...")
+                result = subprocess.run(['ping', '-c', '3', '-W', '5', host],
+                                      capture_output=True, text=True, timeout=20)
+                if result.returncode == 0:
+                    print(f"✅ {host} - Reachable")
+                    # Extract ping time if available
+                    lines = result.stdout.split('\n')
+                    for line in lines:
+                        if 'time=' in line:
+                            print(f"   Sample: {line.strip()}")
+                            break
+                else:
+                    print(f"❌ {host} - Unreachable")
+            except Exception as e:
+                print(f"❌ {host} - Error: {e}")
+
+    def run(self):
+        """Main application loop with improved error handling."""
+        self.logger.info("WireGuard Configuration Activator started")
+        print("🔧 WireGuard Configuration Activator - Enhanced")
+        print("=" * 50)
+
         while True:
-            if not self.find_configs():
-                self.logger.error("No configurations found. Exiting.")
-                sys.exit(1)
+            try:
+                if not self.find_configs():
+                    self.logger.error("No configurations found. Exiting.")
+                    sys.exit(1)
 
-            self.display_configs()
-            choice = self.show_menu()
+                self.display_configs()
+                choice = self.show_menu()
 
-            if choice == 'q':
-                self.logger.info("User chose to quit")
-                print("Goodbye!")
+                if choice == 'q':
+                    self.logger.info("User chose to quit")
+                    print("👋 Goodbye!")
+                    break
+                elif choice == 'd':
+                    self.logger.info("User chose to deactivate all interfaces")
+                    self.deactivate_all()
+                elif choice == 'r':
+                    self.logger.info("User chose to refresh configurations")
+                    print("🔄 Refreshing configurations...")
+                    continue
+                elif choice == 's':
+                    self.logger.info("User chose to show status")
+                    self.show_status()
+                elif choice == 't':
+                    self.logger.info("User chose to test connectivity")
+                    self.test_connectivity()
+                else:
+                    try:
+                        choice_num = int(choice)
+                        if 1 <= choice_num <= len(self.configs):
+                            selected_config = self.configs[choice_num - 1]
+                            self.logger.info(f"User selected config {choice_num}: {selected_config.stem}")
+                            self.activate_config(selected_config)
+                        else:
+                            error_msg = f"Invalid choice: {choice_num}"
+                            self.logger.warning(error_msg)
+                            print(f"❌ Please enter a number between 1 and {len(self.configs)}")
+                    except ValueError:
+                        self.logger.warning(f"Invalid menu option: '{choice}'")
+                        print("❌ Invalid option. Please try again.")
+
+                input("\n⏎ Press Enter to continue...")
+
+            except KeyboardInterrupt:
+                self.logger.info("User interrupted with Ctrl+C")
+                print("\n\n👋 Interrupted by user. Goodbye!")
                 break
-            elif choice == 'd':
-                self.logger.info("User chose to deactivate all interfaces")
-                self.deactivate_all()
-            elif choice == 'r':
-                self.logger.info("User chose to refresh configurations")
-                print("Refreshing configurations...")
-                continue
-            elif choice == 's':
-                self.logger.info("User chose to show status")
-                self.show_status()
-            else:
-                try:
-                    choice_num = int(choice)
-                    if 1 <= choice_num <= len(self.configs):
-                        selected_config = self.configs[choice_num - 1]
-                        self.logger.info(f"User selected config {choice_num}: {selected_config.stem}")
-                        self.activate_config(selected_config)
-                    else:
-                        error_msg = f"Invalid choice: {choice_num}"
-                        self.logger.warning(error_msg)
-                        print(f"Please enter a number between 1 and {len(self.configs)}")
-                except ValueError:
-                    self.logger.warning(f"Invalid menu option: '{choice}'")
-                    print("Invalid option. Please try again.")
-
-            input("\nPress Enter to continue...")
+            except Exception as e:
+                self.logger.error(f"Unexpected error in main loop: {e}", exc_info=True)
+                print(f"❌ Unexpected error: {e}")
+                input("\n⏎ Press Enter to continue...")
 
         self.logger.info("WireGuard Configuration Activator ended")
 
 def main():
-    """Main entry point."""
+    """Main entry point with improved argument handling."""
     import argparse
 
-    parser = argparse.ArgumentParser(description="WireGuard Configuration Activator")
+    parser = argparse.ArgumentParser(
+        description="WireGuard Configuration Activator - Enhanced Version",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  %(prog)s                           # Use default /etc/wireguard directory
+  %(prog)s /path/to/configs          # Use custom configuration directory
+  %(prog)s --log-level DEBUG         # Enable debug logging
+  %(prog)s --quiet                   # Minimal output
+        """
+    )
+
     parser.add_argument('config_dir', nargs='?', default='/etc/wireguard',
                        help='Path to WireGuard configuration directory (default: /etc/wireguard)')
     parser.add_argument('--log-level', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
                        default='INFO', help='Set logging level (default: INFO)')
     parser.add_argument('--quiet', '-q', action='store_true',
                        help='Suppress console output except errors')
+    parser.add_argument('--version', action='version', version='WireGuard Activator 2.0')
 
     args = parser.parse_args()
 
@@ -286,7 +427,7 @@ def main():
 
     # Check if running as root for sudo operations
     if os.geteuid() != 0:
-        print("Note: This script will use 'sudo' for WireGuard operations.")
+        print("ℹ️  Note: This script will use 'sudo' for WireGuard operations.")
         print("You may be prompted for your password.\n")
 
     try:
@@ -297,7 +438,7 @@ def main():
         logging.basicConfig(level=logging.ERROR)
         logger = logging.getLogger('WireGuardActivator')
         logger.error(f"Critical error in main: {e}", exc_info=True)
-        print(f"Critical error: {e}")
+        print(f"💥 Critical error: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":
