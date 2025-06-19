@@ -32,7 +32,7 @@ class WebsiteCloner:
             log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
         """
         self.base_output_dir = Path(base_output_dir).expanduser().resolve()
-        self.logger =setup_logging(log_level, log_file="website_cloner.log")
+        self.logger = setup_logging(log_level, log_file="website_cloner.log")
         self._validate_dependencies()
         self._setup_output_directory()
 
@@ -51,12 +51,11 @@ class WebsiteCloner:
         # Get HTTrack version for logging
         try:
             result = subprocess.run(
-                ["httrack", "--version"],
-                capture_output=True,
-                text=True,
-                timeout=10
+                ["httrack", "--version"], capture_output=True, text=True, timeout=10
             )
-            version_info = result.stdout.split('\n')[0] if result.stdout else "Unknown version"
+            version_info = (
+                result.stdout.split("\n")[0] if result.stdout else "Unknown version"
+            )
             self.logger.info(f"HTTrack found: {version_info}")
         except Exception as e:
             self.logger.warning(f"Could not determine HTTrack version: {e}")
@@ -74,7 +73,9 @@ class WebsiteCloner:
             self.logger.debug("Write permissions confirmed")
 
         except PermissionError as e:
-            error_msg = f"Permission denied creating output directory: {self.base_output_dir}"
+            error_msg = (
+                f"Permission denied creating output directory: {self.base_output_dir}"
+            )
             self.logger.critical(error_msg)
             raise PermissionError(error_msg) from e
         except Exception as e:
@@ -160,8 +161,15 @@ class WebsiteCloner:
             cmd = [
                 "httrack",
                 normalized_url,
-                "-O", str(output_path),
-                "+*.css", "+*.js", "+*.html", "+*.png", "+*.jpg", "+*.gif", "+*.ico",
+                "-O",
+                str(output_path),
+                "+*.css",
+                "+*.js",
+                "+*.html",
+                "+*.png",
+                "+*.jpg",
+                "+*.gif",
+                "+*.ico",
                 "--display",  # Show progress
                 "--robots=0",  # Ignore robots.txt
                 "--timeout=60",  # Set timeout
@@ -182,7 +190,7 @@ class WebsiteCloner:
                 capture_output=True,
                 text=True,
                 timeout=3600,  # 1 hour timeout
-                check=True
+                check=True,
             )
 
             elapsed_time = time.time() - start_time
@@ -196,7 +204,9 @@ class WebsiteCloner:
             # Check if files were actually created
             if output_path.exists() and any(output_path.iterdir()):
                 file_count = len(list(output_path.rglob("*")))
-                size_mb = sum(f.stat().st_size for f in output_path.rglob("*") if f.is_file()) / (1024*1024)
+                size_mb = sum(
+                    f.stat().st_size for f in output_path.rglob("*") if f.is_file()
+                ) / (1024 * 1024)
 
                 self.logger.info(
                     f"✅ Successfully cloned {normalized_url} "
@@ -205,7 +215,9 @@ class WebsiteCloner:
                 )
                 return True
             else:
-                self.logger.error(f"❌ Clone appeared successful but no files were created for {normalized_url}")
+                self.logger.error(
+                    f"❌ Clone appeared successful but no files were created for {normalized_url}"
+                )
                 return False
 
         except subprocess.TimeoutExpired:
@@ -224,11 +236,13 @@ class WebsiteCloner:
             elapsed_time = time.time() - start_time
             self.logger.error(
                 f"❌ Unexpected error cloning {url} after {elapsed_time:.1f}s: {e}",
-                exc_info=True
+                exc_info=True,
             )
             return False
 
-    def clone_multiple_sites(self, urls: List[str], custom_options: Optional[List[str]] = None) -> dict:
+    def clone_multiple_sites(
+        self, urls: List[str], custom_options: Optional[List[str]] = None
+    ) -> dict:
         """
         Clone multiple websites.
 
@@ -246,9 +260,9 @@ class WebsiteCloner:
         successful = 0
 
         for i, url in enumerate(urls, 1):
-            self.logger.info(f"\n{'='*60}")
+            self.logger.info(f"\n{'=' * 60}")
             self.logger.info(f"Processing {i}/{len(urls)}: {url}")
-            self.logger.info(f"{'='*60}")
+            self.logger.info(f"{'=' * 60}")
 
             success = self.clone_site(url, custom_options)
             results[url] = success
@@ -259,9 +273,9 @@ class WebsiteCloner:
         elapsed_time = time.time() - start_time
 
         # Summary
-        self.logger.info(f"\n{'='*60}")
+        self.logger.info(f"\n{'=' * 60}")
         self.logger.info("BATCH CLONE SUMMARY")
-        self.logger.info(f"{'='*60}")
+        self.logger.info(f"{'=' * 60}")
         self.logger.info(f"Total sites: {len(urls)}")
         self.logger.info(f"Successful: {successful}")
         self.logger.info(f"Failed: {len(urls) - successful}")
@@ -282,33 +296,31 @@ Examples:
   %(prog)s -d ~/my-docs https://docs.python.org https://flask.palletsprojects.com
   %(prog)s --log-level DEBUG https://example.com
   %(prog)s --httrack-options "--max-rate=1000 --depth=2" https://example.com
-        """
+        """,
     )
 
     parser.add_argument(
-        "urls",
-        metavar="URL",
-        nargs="+",
-        help="One or more URLs to clone"
+        "urls", metavar="URL", nargs="+", help="One or more URLs to clone"
     )
 
     parser.add_argument(
-        "-d", "--dir",
+        "-d",
+        "--dir",
         help="Base output directory (default: ~/Coding/docs)",
-        default="~/Coding/docs"
+        default="~/Coding/docs",
     )
 
     parser.add_argument(
         "--log-level",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         default="INFO",
-        help="Set logging level (default: INFO)"
+        help="Set logging level (default: INFO)",
     )
 
     parser.add_argument(
         "--httrack-options",
         help="Additional HTTrack options (space-separated string)",
-        default=""
+        default="",
     )
 
     args = parser.parse_args()

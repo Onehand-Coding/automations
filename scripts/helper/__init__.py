@@ -11,5 +11,5 @@ from .funcs import (
     read_print_json,
     csv_dict_writer,
     read_csv_dict_output,
-    read_csv_list_output
+    read_csv_list_output,
 )

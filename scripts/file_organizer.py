@@ -2,31 +2,42 @@ import os
 import re
 import sys
 import shutil
-import logging
 import argparse
 from enum import Enum
 from pathlib import Path
-from typing import List, Dict, Set, Optional, Union, Tuple
+from typing import List, Dict, Set, Optional, Union
 from collections import defaultdict
 from itertools import combinations, zip_longest
 
 from send2trash import send2trash
 
-from helper import get_folder_path, new_filepath, setup_logging
+from helper import new_filepath, setup_logging
 
 # Constants
-TO_REPLACE_PATTERN = re.compile(r'\[.*\]|\(.*\)')
-SPLIT_PATTERN = re.compile(r'\s+|[.,:_-]')
+TO_REPLACE_PATTERN = re.compile(r"\[.*\]|\(.*\)")
+SPLIT_PATTERN = re.compile(r"\s+|[.,:_-]")
 
 logger = setup_logging(log_file="file_organizer.log")
 
 
 class FileTypes(Enum):
     """Enum for different file types and their extensions."""
+
     VIDEO = (".mp4", ".mkv", ".webm", ".3gp")
     AUDIO = (".mp3", ".m4a", ".wav")
     IMAGE = (".jfif", ".jpg", ".png", ".jpeg", ".gif")
-    OFFICE = (".docx", ".xlsx", ".pptx", ".pdf", ".doc", ".xlsm", ".pub", ".odt", ".pptm", ".ppsx")
+    OFFICE = (
+        ".docx",
+        ".xlsx",
+        ".pptx",
+        ".pdf",
+        ".doc",
+        ".xlsm",
+        ".pub",
+        ".odt",
+        ".pptm",
+        ".ppsx",
+    )
     TEXT = (".html", ".css", ".js", ".py", ".txt", ".csv", ".json")
     ARCHIVE = (".zip", ".tar", ".7z", ".rar", ".gz")
 
@@ -34,7 +45,11 @@ class FileTypes(Enum):
 class FileOrganizer:
     """Class to organize files in a directory."""
 
-    def __init__(self, to_sort_path: Union[str, Path], to_exclude_files: Optional[List[str]] = None):
+    def __init__(
+        self,
+        to_sort_path: Union[str, Path],
+        to_exclude_files: Optional[List[str]] = None,
+    ):
         """Initialize FileOrganizer.
 
         Args:
@@ -45,7 +60,9 @@ class FileOrganizer:
         self.to_exclude_files = to_exclude_files or []
 
         if not isinstance(self.to_exclude_files, list):
-            raise TypeError("to_exclude_files argument must be a list of file or folder names!")
+            raise TypeError(
+                "to_exclude_files argument must be a list of file or folder names!"
+            )
 
         self.destination_folders = set()
 
@@ -90,8 +107,11 @@ class FileOrganizer:
         Returns:
             List of folders not excluded
         """
-        return [folder for folder in self.to_sort_path.rglob("*/")
-                if not self.should_exclude(folder)]
+        return [
+            folder
+            for folder in self.to_sort_path.rglob("*/")
+            if not self.should_exclude(folder)
+        ]
 
     def get_files(self, folder: Optional[Path] = None) -> List[Path]:
         """Get all files in the directory to sort or in a specific folder.
@@ -103,8 +123,11 @@ class FileOrganizer:
             List of files not excluded
         """
         if folder is not None:
-            return [file for file in folder.glob("*")
-                   if file.is_file() and not self.should_exclude(file)]
+            return [
+                file
+                for file in folder.glob("*")
+                if file.is_file() and not self.should_exclude(file)
+            ]
 
         return [
             Path(root) / file
@@ -123,7 +146,9 @@ class FileOrganizer:
         """
         # Handle case where destination is a file
         if dest.exists() and dest.is_file():
-            logger.debug('Destination folder has the same name as the file. Using file parent as destination...')
+            logger.debug(
+                "Destination folder has the same name as the file. Using file parent as destination..."
+            )
             dest = dest.parent
 
         # Create destination path and ensure destination folder exists
@@ -132,15 +157,15 @@ class FileOrganizer:
 
         # Handle file name conflicts
         if destination_file.exists() and not destination_file.samefile(file):
-            destination_file = new_filepath(destination_file, add_prefix='_Duplicate')
+            destination_file = new_filepath(destination_file, add_prefix="_Duplicate")
 
         # Move the file
         if not destination_file.exists():
-            logger.debug(f'Moving {file} to {dest}')
+            logger.debug(f"Moving {file} to {dest}")
             try:
                 shutil.move(str(file), str(destination_file))
             except FileNotFoundError:
-                logger.warning(f'Not moved: {file}, This file may be deleted.')
+                logger.warning(f"Not moved: {file}, This file may be deleted.")
 
     def type_sort(self) -> None:
         """Sort files by their type (extension)."""
@@ -199,15 +224,19 @@ class FileOrganizer:
         if not common_stems:
             return
 
-        file_stems = [get_split_stem(SPLIT_PATTERN, TO_REPLACE_PATTERN, file.stem)
-                     for file in unsorted_files]
+        file_stems = [
+            get_split_stem(SPLIT_PATTERN, TO_REPLACE_PATTERN, file.stem)
+            for file in unsorted_files
+        ]
 
         # Group files by common stem
         stem_folders = defaultdict(list)
         for file, file_stem in zip(unsorted_files, file_stems):
             for common_stem in common_stems:
-                if len(common_stem) <= len(file_stem) and all(x == y for x, y in zip(common_stem, file_stem)):
-                    stem_folders[' '.join(common_stem).strip()].append(file)
+                if len(common_stem) <= len(file_stem) and all(
+                    x == y for x, y in zip(common_stem, file_stem)
+                ):
+                    stem_folders[" ".join(common_stem).strip()].append(file)
 
         # Move files to stem folders if there are multiple stems with multiple files
         if len(stem_folders) > 1:
@@ -216,7 +245,9 @@ class FileOrganizer:
                 files = stem_folders[common_stem]
                 if len(files) > 1:
                     for file in files:
-                        if file.exists() and not set(common_stem.split()) <= set(file.parts):
+                        if file.exists() and not set(common_stem.split()) <= set(
+                            file.parts
+                        ):
                             stem_folder = file.parent / common_stem
                             self.move_file(file, stem_folder)
                             self.destination_folders.add(stem_folder)
@@ -224,36 +255,36 @@ class FileOrganizer:
     def simple_sort(self) -> None:
         """Perform a simple sort by file extension and prefix."""
         unsorted_files = self.get_files(self.to_sort_path)
-        existing_folders = set(self.to_sort_path.glob('*/'))
+        existing_folders = set(self.to_sort_path.glob("*/"))
 
-        logger.info('Running simple sort...')
+        logger.info("Running simple sort...")
         # Sort by extension
         for file in unsorted_files:
             ext_name = file.suffix.strip(".") if file.suffix else "unknown"
             ext_dest = file.parent / f"{ext_name} files"
             self.move_file(file, ext_dest)
 
-        logger.info('Running prefix_sort...')
+        logger.info("Running prefix_sort...")
         # Sort by prefix in newly created folders
-        new_folders = set(self.to_sort_path.glob('*/')) - existing_folders
+        new_folders = set(self.to_sort_path.glob("*/")) - existing_folders
         for folder in new_folders:
             self.prefix_sort(folder)
 
-        logger.info('Verifying files...')
-        verify_files(unsorted_files, self.get_files(self.to_sort_path), method='Simple')
+        logger.info("Verifying files...")
+        verify_files(unsorted_files, self.get_files(self.to_sort_path), method="Simple")
 
     def recursive_sort(self) -> None:
         """Perform a recursive sort by type, prefix, and stem."""
         unsorted_files = self.get_files()
 
-        logger.info('Running type_sort...')
+        logger.info("Running type_sort...")
         self.type_sort()
 
-        logger.info('Running prefix_sort...')
+        logger.info("Running prefix_sort...")
         for folder in self.get_folders():
             self.prefix_sort(folder)
 
-        logger.info('Running stem_sort...')
+        logger.info("Running stem_sort...")
         for folder in self.get_folders():
             self.stem_sort(folder)
 
@@ -261,11 +292,19 @@ class FileOrganizer:
         empty_folders = set(self.get_folders()) - self.destination_folders
         remove_folders(empty_folders)
 
-        logger.info('Verifying files...')
-        verify_files(unsorted_files, self.get_files(), empty_folders, method='Aggressive')
+        logger.info("Verifying files...")
+        verify_files(
+            unsorted_files, self.get_files(), empty_folders, method="Aggressive"
+        )
 
 
-def verify_files(unsorted_files: List[Path], sorted_files: List[Path], empty_folders: Optional[Set[Path]] = None, *, method: str = '') -> None:
+def verify_files(
+    unsorted_files: List[Path],
+    sorted_files: List[Path],
+    empty_folders: Optional[Set[Path]] = None,
+    *,
+    method: str = "",
+) -> None:
     """Verify that all files were correctly sorted.
 
     Args:
@@ -288,16 +327,25 @@ def verify_files(unsorted_files: List[Path], sorted_files: List[Path], empty_fol
         for filename in removed_filenames:
             try:
                 # Find the original file and the folder it was in
-                original_file = next(file for file in unsorted_files if file.name == filename)
+                original_file = next(
+                    file for file in unsorted_files if file.name == filename
+                )
                 deleted_folder = next(
-                    folder.name for folder in empty_folders
+                    folder.name
+                    for folder in empty_folders
                     if any(part in original_file.parts for part in folder.parts)
                 )
-                logger.warning(f'Deleted file: {filename} from Folder: {deleted_folder}')
+                logger.warning(
+                    f"Deleted file: {filename} from Folder: {deleted_folder}"
+                )
             except (StopIteration, IndexError):
-                logger.warning(f'Deleted file: {filename}, unable to determine containing folder')
+                logger.warning(
+                    f"Deleted file: {filename}, unable to determine containing folder"
+                )
 
-        logger.error(f"{method.title()} sorting finished with error! {len(removed_filenames)} were accidentally deleted, check your trash bin.")
+        logger.error(
+            f"{method.title()} sorting finished with error! {len(removed_filenames)} were accidentally deleted, check your trash bin."
+        )
 
     if len(unsorted_filenames) == len(sorted_filenames):
         logger.info("File verification Done! No accidental deletion occured.")
@@ -313,9 +361,9 @@ def remove_folders(folders: Set[Path]) -> None:
     if not folders:
         return
 
-    logger.info('Moving empty folders to trash...')
+    logger.info("Moving empty folders to trash...")
     for folder in folders:
-        logger.debug(f'Moving {folder} to trash...')
+        logger.debug(f"Moving {folder} to trash...")
         try:
             send2trash(str(folder))
         except Exception as e:
@@ -335,7 +383,7 @@ def split_stem(split_pattern: re.Pattern, stem: str) -> List[str]:
     return [part for part in re.split(split_pattern, stem) if part]
 
 
-def clean_stem(to_replace_pattern: re.Pattern, stem: str, replacement: str = '') -> str:
+def clean_stem(to_replace_pattern: re.Pattern, stem: str, replacement: str = "") -> str:
     """Clean a file stem by removing patterns.
 
     Args:
@@ -349,7 +397,9 @@ def clean_stem(to_replace_pattern: re.Pattern, stem: str, replacement: str = '')
     return re.sub(to_replace_pattern, replacement, stem).strip()
 
 
-def get_split_stem(split_pattern: re.Pattern, to_replace_pattern: re.Pattern, stem: str) -> List[str]:
+def get_split_stem(
+    split_pattern: re.Pattern, to_replace_pattern: re.Pattern, stem: str
+) -> List[str]:
     """Clean and split a file stem.
 
     Args:
@@ -377,36 +427,54 @@ def get_common_stems(files: List[Path]) -> List[List[str]]:
         return []
 
     # Split all file stems
-    file_stems = [get_split_stem(SPLIT_PATTERN, TO_REPLACE_PATTERN, file.stem) for file in files]
+    file_stems = [
+        get_split_stem(SPLIT_PATTERN, TO_REPLACE_PATTERN, file.stem) for file in files
+    ]
 
     # Find common stems between all pairs of files
     common_stems = []
     for stem1, stem2 in combinations(file_stems, 2):
         # Find common words in the same positions
-        common_words = [x for x, y in zip_longest(stem1, stem2, fillvalue=None) if x == y and x is not None]
+        common_words = [
+            x
+            for x, y in zip_longest(stem1, stem2, fillvalue=None)
+            if x == y and x is not None
+        ]
         if common_words:
             common_stems.append(tuple(common_words))
 
     # Remove duplicates and filter out single-word stems
     common_stems = list(set(common_stems))
-    return [list(common_stem) for common_stem in common_stems
-            if common_stem and len(set(common_stem)) > 1]
+    return [
+        list(common_stem)
+        for common_stem in common_stems
+        if common_stem and len(set(common_stem)) > 1
+    ]
 
 
 def main() -> None:
     """Main function to run the file organizer."""
     parser = argparse.ArgumentParser(
-        description="File Organizer tool with simple and agressive file sorting method.",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+        description="File Organizer tool with simple and recursive file sorting method.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("folder_path", help="Absolute path for folder you wish to organize the files from.")
-    parser.add_argument("--method", "-m", choices=["simple", "agressive"], help="Sorting method to use", default= "agressive")
+    parser.add_argument(
+        "folder_path",
+        help="Absolute path for folder you wish to organize the files from.",
+    )
+    parser.add_argument(
+        "--method",
+        "-m",
+        choices=["simple", "recursive"],
+        help="Sorting method to use",
+        default="recursive",
+    )
 
     args = parser.parse_args()
 
-    #Set the default sorting method to agressive if not specified.
+    # Set the default sorting method to recursive if not specified.
     if not args.method:
-        args.method = "agressive"
+        args.method = "recursive"
     logger.info(f"Starting File organizer tool using '{args.method}' method.")
 
     # Get path to sort
@@ -414,7 +482,7 @@ def main() -> None:
     organizer = FileOrganizer(folder_path)
 
     # Get sorting method
-    if args.method == "agressive":
+    if args.method == "recursive":
         organizer.recursive_sort()
     elif args.method == "simple":
         organizer.simple_sort()

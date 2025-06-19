@@ -6,7 +6,9 @@ from datetime import datetime
 from typing import List, Dict, Any, Union, Optional, Callable
 
 
-def confirm(question: str, /, *, choice: str = "[Y/N] :", confirm_letter: str = 'y') -> bool:
+def confirm(
+    question: str, /, *, choice: str = "[Y/N] :", confirm_letter: str = "y"
+) -> bool:
     """Prompt user for confirmation.
 
     Args:
@@ -20,7 +22,7 @@ def confirm(question: str, /, *, choice: str = "[Y/N] :", confirm_letter: str = 
     return input(f"{question} {choice} ").lower().strip().startswith(confirm_letter)
 
 
-def get_str_datetime(date_format: str = '%B %d, %Y  %I:%M %p') -> str:
+def get_str_datetime(date_format: str = "%B %d, %Y  %I:%M %p") -> str:
     """Get the current date and time as a formatted string.
 
     Args:
@@ -40,9 +42,9 @@ def get_valid_num() -> int:
     """
     while True:
         try:
-            return int(input('> '))
+            return int(input("> "))
         except ValueError:
-            print('Enter an integer!')
+            print("Enter an integer!")
 
 
 def get_index(list_of_data: List) -> int:
@@ -62,8 +64,13 @@ def get_index(list_of_data: List) -> int:
         print(f"Index should be between 1 and {length}. Try again.")
 
 
-def new_filepath(file: Union[str, Path], *, parent: Optional[Union[str, Path]] = None,
-                add_prefix: str = '', start_count: int = 1) -> Path:
+def new_filepath(
+    file: Union[str, Path],
+    *,
+    parent: Optional[Union[str, Path]] = None,
+    add_prefix: str = "",
+    start_count: int = 1,
+) -> Path:
     """Generate a new filepath to avoid duplicates.
 
     Args:
@@ -79,7 +86,10 @@ def new_filepath(file: Union[str, Path], *, parent: Optional[Union[str, Path]] =
     base_path = Path(parent).absolute() / file_path if parent else file_path
 
     while True:
-        new_path = base_path.parent / f'{base_path.stem}{add_prefix}({start_count}){base_path.suffix}'
+        new_path = (
+            base_path.parent
+            / f"{base_path.stem}{add_prefix}({start_count}){base_path.suffix}"
+        )
         if not new_path.exists():
             return new_path
         start_count += 1
@@ -94,15 +104,15 @@ def get_folder_path(task: str) -> Path:
     Returns:
         Path object representing the validated folder path
     """
-    print(f'Enter the absolute path for {task}')
+    print(f"Enter the absolute path for {task}")
     while True:
-        path = input('> ').strip()
+        path = input("> ").strip()
         if path and Path(path).exists():
             return Path(path).absolute()
-        print('Invalid path. Please enter a valid path!')
+        print("Invalid path. Please enter a valid path!")
 
 
-def choose(choices: List, task: str = '') -> Any:
+def choose(choices: List, task: str = "") -> Any:
     """Prompt the user to choose an item from a list.
 
     Args:
@@ -113,23 +123,25 @@ def choose(choices: List, task: str = '') -> Any:
         The chosen item
     """
     if not isinstance(choices, list) or len(choices) <= 1:
-        raise ValueError('Choices must be a list with more than one element.')
+        raise ValueError("Choices must be a list with more than one element.")
 
     if len(choices) == 2:
-        print(*choices, sep=' or ', end='?\n')
+        print(*choices, sep=" or ", end="?\n")
         choice = None
         while choice not in choices:
-            choice = input('> ')
+            choice = input("> ")
         return choice
 
-    article = 'an' if task and task[0].lower() in 'aeiou' else 'a'
-    print(f'Choose {article} {task}')
+    article = "an" if task and task[0].lower() in "aeiou" else "a"
+    print(f"Choose {article} {task}")
     for index, item in enumerate(choices, start=1):
         print(index, item)
     return choices[get_index(choices)]
 
 
-def write_to_json(json_file: Union[str, Path], json_key: str, json_data: Any, indent: int = 4) -> None:
+def write_to_json(
+    json_file: Union[str, Path], json_key: str, json_data: Any, indent: int = 4
+) -> None:
     """Write data to a JSON file with specified key.
 
     Args:
@@ -148,13 +160,18 @@ def read_print_json(json_file: Union[str, Path]) -> None:
     Args:
         json_file: Path to the JSON file
     """
-    with open(json_file, 'r') as f:
+    with open(json_file, "r") as f:
         data = json.load(f)
     print(json.dumps(data, indent=4))
 
 
-def csv_dict_writer(filename: Union[str, Path], data: List[Dict], *,
-                   delimiter: str = ",", fieldnames: Optional[List[str]] = None) -> None:
+def csv_dict_writer(
+    filename: Union[str, Path],
+    data: List[Dict],
+    *,
+    delimiter: str = ",",
+    fieldnames: Optional[List[str]] = None,
+) -> None:
     """Write list of dictionaries to a CSV file.
 
     Args:
@@ -172,29 +189,29 @@ def csv_dict_writer(filename: Union[str, Path], data: List[Dict], *,
         csv_writer.writerows(data)
 
 
-def read_csv_dict_output(csv_file: Union[str, Path], *, delimiter: str = ',') -> None:
+def read_csv_dict_output(csv_file: Union[str, Path], *, delimiter: str = ",") -> None:
     """Read and print contents of a CSV file as dictionaries.
 
     Args:
         csv_file: Path to the CSV file
         delimiter: Delimiter character for CSV
     """
-    with open(csv_file, 'r', encoding='utf-8') as f:
+    with open(csv_file, "r", encoding="utf-8") as f:
         csv_reader = csv.DictReader(f, delimiter=delimiter)
         for row in csv_reader:
             for key, value in row.items():
-                print(f'{key}: {value}')
+                print(f"{key}: {value}")
             print()
 
 
-def read_csv_list_output(csv_file: Union[str, Path], *, delimiter: str = ',') -> None:
+def read_csv_list_output(csv_file: Union[str, Path], *, delimiter: str = ",") -> None:
     """Read and print contents of a CSV file as lists.
 
     Args:
         csv_file: Path to the CSV file
         delimiter: Delimiter character for CSV
     """
-    with open(csv_file, 'r', encoding='utf-8') as f:
+    with open(csv_file, "r", encoding="utf-8") as f:
         csv_reader = csv.reader(f, delimiter=delimiter)
         headers = next(csv_reader)
         print()

@@ -7,6 +7,7 @@ from typing import List, Dict, Optional
 
 from helper import write_to_json, read_print_json, DATA_DIR
 
+
 def get_ssids() -> List[str]:
     """Get list of SSIDs of previous and present wifi connections of the device.
     Returns:
@@ -21,18 +22,25 @@ def get_ssids() -> List[str]:
                 ["netsh", "wlan", "show", "profiles"],
                 capture_output=True,
                 text=True,
-                check=True
+                check=True,
             )
             ssids = re.findall(r"All User Profile\s+:\s+(.*)\r", result.stdout)
         elif system == "Darwin":  # macOS
             result = subprocess.run(
-                ["/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport", "-s"],
+                [
+                    "/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport",
+                    "-s",
+                ],
                 capture_output=True,
                 text=True,
-                check=True
+                check=True,
             )
             # Extract SSIDs from airport output (skipping header line)
-            ssids = [line.split()[0] for line in result.stdout.splitlines()[1:] if line.strip()]
+            ssids = [
+                line.split()[0]
+                for line in result.stdout.splitlines()[1:]
+                if line.strip()
+            ]
         elif system == "Linux":
             # Try nmcli first (most modern Linux distros)
             try:
@@ -40,7 +48,7 @@ def get_ssids() -> List[str]:
                     ["nmcli", "-t", "-f", "name", "connection", "show"],
                     capture_output=True,
                     text=True,
-                    check=True
+                    check=True,
                 )
                 ssids = [line for line in result.stdout.splitlines() if line.strip()]
             except (subprocess.CalledProcessError, FileNotFoundError):
@@ -63,6 +71,7 @@ def get_ssids() -> List[str]:
         print(f"Unexpected error getting SSIDs: {e}")
         return []
 
+
 def get_passwords(ssids: List[str]) -> List[Dict[str, str]]:
     """Get passwords for each SSID.
     Args:
@@ -82,10 +91,12 @@ def get_passwords(ssids: List[str]) -> List[Dict[str, str]]:
                     ["netsh", "wlan", "show", "profile", ssid, "key=clear"],
                     capture_output=True,
                     text=True,
-                    check=False
+                    check=False,
                 )
                 password_match = re.search(r"Key Content\s+:\s+(.*)\r", result.stdout)
-                wifi_info["Password"] = password_match.group(1) if password_match else "No password"
+                wifi_info["Password"] = (
+                    password_match.group(1) if password_match else "No password"
+                )
 
             elif system == "Darwin":  # macOS
                 # macOS stores passwords in Keychain
@@ -93,19 +104,29 @@ def get_passwords(ssids: List[str]) -> List[Dict[str, str]]:
                     ["security", "find-generic-password", "-wa", ssid],
                     capture_output=True,
                     text=True,
-                    check=False
+                    check=False,
                 )
                 password = result.stdout.strip()
-                wifi_info["Password"] = password if password and not result.stderr else "No password"
+                wifi_info["Password"] = (
+                    password if password and not result.stderr else "No password"
+                )
 
             elif system == "Linux":
                 # Try nmcli first
                 try:
                     result = subprocess.run(
-                        ["nmcli", "-s", "-g", "802-11-wireless-security.psk", "connection", "show", ssid],
+                        [
+                            "nmcli",
+                            "-s",
+                            "-g",
+                            "802-11-wireless-security.psk",
+                            "connection",
+                            "show",
+                            ssid,
+                        ],
                         capture_output=True,
                         text=True,
-                        check=True
+                        check=True,
                     )
                     password = result.stdout.strip()
                     wifi_info["Password"] = password if password else "No password"
@@ -115,10 +136,16 @@ def get_passwords(ssids: List[str]) -> List[Dict[str, str]]:
                     if wifi_path.exists():
                         try:
                             content = wifi_path.read_text()
-                            password_match = re.search(r'psk=(.*)', content)
-                            wifi_info["Password"] = password_match.group(1) if password_match else "No password"
+                            password_match = re.search(r"psk=(.*)", content)
+                            wifi_info["Password"] = (
+                                password_match.group(1)
+                                if password_match
+                                else "No password"
+                            )
                         except Exception:
-                            wifi_info["Password"] = "Password exists but couldn't be read"
+                            wifi_info["Password"] = (
+                                "Password exists but couldn't be read"
+                            )
                     else:
                         wifi_info["Password"] = "No password"
 
@@ -136,6 +163,7 @@ def get_passwords(ssids: List[str]) -> List[Dict[str, str]]:
 
     return wifi_list
 
+
 def save_wifi_data(wifi_data: List[Dict[str, str]], output_file: Path) -> None:
     """Save wifi data to a JSON file.
     Args:
@@ -144,6 +172,7 @@ def save_wifi_data(wifi_data: List[Dict[str, str]], output_file: Path) -> None:
     """
     print(f"Writing wifi data to {output_file}...")
     write_to_json(output_file, "wifi_passwords", wifi_data)
+
 
 def main() -> None:
     """Main function to retrieve and save wifi passwords."""
@@ -165,5 +194,6 @@ def main() -> None:
     print("\nSaved wifi passwords:")
     read_print_json(wifi_data_file)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

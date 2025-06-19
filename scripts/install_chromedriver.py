@@ -39,7 +39,7 @@ class ChromeDriverInstaller:
         "linux": "linux64",
         "darwin": "mac-x64" if platform.machine() != "arm64" else "mac-arm64",
         "win32": "win32",
-        "win64": "win64"
+        "win64": "win64",
     }
 
     # Browser executable names by platform and browser type
@@ -55,16 +55,28 @@ class ChromeDriverInstaller:
             "chromium": ["/Applications/Chromium.app/Contents/MacOS/Chromium"],
         },
         "win32": {
-            "chrome": ["C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-                      "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"],
-            "brave": ["C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe",
-                     "C:\\Program Files (x86)\\BraveSoftware\\Brave-Browser\\Application\\brave.exe"],
-            "chromium": ["C:\\Program Files\\Chromium\\Application\\chrome.exe",
-                        "C:\\Program Files (x86)\\Chromium\\Application\\chrome.exe"],
+            "chrome": [
+                "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+                "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+            ],
+            "brave": [
+                "C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe",
+                "C:\\Program Files (x86)\\BraveSoftware\\Brave-Browser\\Application\\brave.exe",
+            ],
+            "chromium": [
+                "C:\\Program Files\\Chromium\\Application\\chrome.exe",
+                "C:\\Program Files (x86)\\Chromium\\Application\\chrome.exe",
+            ],
         },
     }
 
-    def __init__(self, browser: str = "brave", force: bool = False, debug: bool = False, dry_run: bool = False):
+    def __init__(
+        self,
+        browser: str = "brave",
+        force: bool = False,
+        debug: bool = False,
+        dry_run: bool = False,
+    ):
         """
         Initialize the ChromeDriver installer.
 
@@ -92,8 +104,12 @@ class ChromeDriverInstaller:
 
         # Set installation paths based on platform
         if self.system.startswith("win"):
-            self.installation_path = os.path.join(os.environ.get("ProgramFiles", "C:\\Program Files"), "ChromeDriver")
-            self.executable_path = os.path.join(self.installation_path, "chromedriver.exe")
+            self.installation_path = os.path.join(
+                os.environ.get("ProgramFiles", "C:\\Program Files"), "ChromeDriver"
+            )
+            self.executable_path = os.path.join(
+                self.installation_path, "chromedriver.exe"
+            )
         else:
             self.installation_path = "/usr/local/bin"
             self.executable_path = os.path.join(self.installation_path, "chromedriver")
@@ -108,7 +124,9 @@ class ChromeDriverInstaller:
         Returns:
             Browser version string or None if not detected
         """
-        executables = self.BROWSER_EXECUTABLES.get(self.system, {}).get(self.browser, [])
+        executables = self.BROWSER_EXECUTABLES.get(self.system, {}).get(
+            self.browser, []
+        )
         if not executables:
             logger.error(f"Unsupported browser '{self.browser}' on {self.system}")
             return None
@@ -135,7 +153,9 @@ class ChromeDriverInstaller:
                 logger.debug(f"Error running {executable}: {e}")
                 continue
 
-        logger.error(f"Could not detect {self.browser} version. Make sure it's installed and accessible.")
+        logger.error(
+            f"Could not detect {self.browser} version. Make sure it's installed and accessible."
+        )
         return None
 
     def get_matching_chromedriver_version(self, browser_version: str) -> Optional[str]:
@@ -148,8 +168,10 @@ class ChromeDriverInstaller:
         Returns:
             Matching ChromeDriver version or None if not found
         """
-        major_version = browser_version.split('.')[0]
-        logger.info(f"Looking for ChromeDriver version matching browser major version {major_version}")
+        major_version = browser_version.split(".")[0]
+        logger.info(
+            f"Looking for ChromeDriver version matching browser major version {major_version}"
+        )
 
         try:
             with urllib.request.urlopen(self.METADATA_URL) as response:
@@ -174,7 +196,9 @@ class ChromeDriverInstaller:
         except Exception as e:
             logger.error(f"Error fetching ChromeDriver metadata: {e}")
 
-        logger.error(f"No matching ChromeDriver version found for browser version {browser_version}")
+        logger.error(
+            f"No matching ChromeDriver version found for browser version {browser_version}"
+        )
         return None
 
     def download_and_install_chromedriver(self, version: str) -> bool:
@@ -193,11 +217,17 @@ class ChromeDriverInstaller:
             return False
 
         base_url = "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing"
-        zip_url = f"{base_url}/{version}/{platform_name}/chromedriver-{platform_name}.zip"
+        zip_url = (
+            f"{base_url}/{version}/{platform_name}/chromedriver-{platform_name}.zip"
+        )
 
         if self.dry_run:
-            logger.info(f"[DRY RUN] Would download ChromeDriver {version} from {zip_url}")
-            logger.info(f"[DRY RUN] Would install ChromeDriver to {self.executable_path}")
+            logger.info(
+                f"[DRY RUN] Would download ChromeDriver {version} from {zip_url}"
+            )
+            logger.info(
+                f"[DRY RUN] Would install ChromeDriver to {self.executable_path}"
+            )
             return True
 
         logger.info(f"Downloading ChromeDriver {version} from {zip_url}")
@@ -210,7 +240,7 @@ class ChromeDriverInstaller:
                 urllib.request.urlretrieve(zip_url, zip_path)
 
                 # Extract the zip file
-                with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                with zipfile.ZipFile(zip_path, "r") as zip_ref:
                     zip_ref.extractall(temp_dir)
 
                 # Find the chromedriver executable in the extracted files
@@ -219,7 +249,9 @@ class ChromeDriverInstaller:
                 else:
                     chromedriver_name = "chromedriver"
 
-                chromedriver_dir = os.path.join(temp_dir, f"chromedriver-{platform_name}")
+                chromedriver_dir = os.path.join(
+                    temp_dir, f"chromedriver-{platform_name}"
+                )
                 chromedriver_path = os.path.join(chromedriver_dir, chromedriver_name)
 
                 # Check if the file exists
@@ -231,7 +263,9 @@ class ChromeDriverInstaller:
                             break
 
                 if not os.path.exists(chromedriver_path):
-                    logger.error(f"Could not find {chromedriver_name} in the downloaded archive")
+                    logger.error(
+                        f"Could not find {chromedriver_name} in the downloaded archive"
+                    )
                     return False
 
                 # Make sure the executable has the right permissions
@@ -247,7 +281,9 @@ class ChromeDriverInstaller:
 
                 # Install the new chromedriver
                 shutil.copy2(chromedriver_path, self.executable_path)
-                logger.info(f"Successfully installed ChromeDriver {version} to {self.executable_path}")
+                logger.info(
+                    f"Successfully installed ChromeDriver {version} to {self.executable_path}"
+                )
 
                 return True
         except Exception as e:
@@ -264,7 +300,9 @@ class ChromeDriverInstaller:
         if not self.force and os.path.exists(self.executable_path):
             try:
                 if self.dry_run:
-                    logger.info(f"[DRY RUN] Would check existing ChromeDriver at {self.executable_path}")
+                    logger.info(
+                        f"[DRY RUN] Would check existing ChromeDriver at {self.executable_path}"
+                    )
                     # In dry-run mode, pretend we don't have a matching version so we can show the full process
                     return False
 
@@ -272,15 +310,19 @@ class ChromeDriverInstaller:
                 result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
                 if result.returncode == 0:
                     chromedriver_version = result.stdout.strip()
-                    match = re.search(r"ChromeDriver (\d+\.\d+\.\d+)", chromedriver_version)
+                    match = re.search(
+                        r"ChromeDriver (\d+\.\d+\.\d+)", chromedriver_version
+                    )
                     if match:
-                        driver_major = match.group(1).split('.')[0]
+                        driver_major = match.group(1).split(".")[0]
                         browser_version = self.get_browser_version()
                         if browser_version:
-                            browser_major = browser_version.split('.')[0]
+                            browser_major = browser_version.split(".")[0]
                             if driver_major == browser_major:
-                                logger.info(f"Existing ChromeDriver installation (version {match.group(1)}) "
-                                           f"matches browser major version {browser_major}")
+                                logger.info(
+                                    f"Existing ChromeDriver installation (version {match.group(1)}) "
+                                    f"matches browser major version {browser_major}"
+                                )
                                 return True
             except (subprocess.SubprocessError, FileNotFoundError) as e:
                 logger.debug(f"Error checking existing ChromeDriver: {e}")
@@ -328,27 +370,37 @@ class ChromeDriverInstaller:
 def main():
     """Main function to parse arguments and run the installer."""
     parser = argparse.ArgumentParser(description="ChromeDriver Auto-Installer")
-    parser.add_argument("--browser", choices=["chrome", "brave", "chromium"], default="brave",
-                        help="Browser to detect (default: brave)")
-    parser.add_argument("--force", action="store_true", help="Force installation even if already installed")
+    parser.add_argument(
+        "--browser",
+        choices=["chrome", "brave", "chromium"],
+        default="brave",
+        help="Browser to detect (default: brave)",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force installation even if already installed",
+    )
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Show what would be done without actually installing anything")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be done without actually installing anything",
+    )
     args = parser.parse_args()
 
     # Check for root privileges on Unix-like systems
     if not args.dry_run and platform.system() != "Windows" and os.geteuid() != 0:
-        logger.error("Please run this script with sudo: `sudo python3 install_chromedriver.py`")
+        logger.error(
+            "Please run this script with sudo: `sudo python3 install_chromedriver.py`"
+        )
         return 1
 
     if args.dry_run:
         logger.info("Running in dry-run mode - no changes will be made")
 
     installer = ChromeDriverInstaller(
-        browser=args.browser,
-        force=args.force,
-        debug=args.debug,
-        dry_run=args.dry_run
+        browser=args.browser, force=args.force, debug=args.debug, dry_run=args.dry_run
     )
     return installer.run()
 
