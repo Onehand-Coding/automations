@@ -14,21 +14,10 @@ import subprocess
 import venv
 from pathlib import Path
 
+from helper import setup_logging
+
 # Assuming 'helper.py' with a confirm function exists in the same directory or a reachable path.
 # from helper import confirm, setup_logging
-
-
-# Mock helper functions if helper.py is not available, for standalone use
-def setup_logging(log_file="project_generator.log"):
-    """Basic logging setup."""
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(levelname)s - %(message)s",
-        handlers=[logging.FileHandler(log_file), logging.StreamHandler()],
-    )
-    logger = logging.getLogger(__name__)
-    logger.info("Logging initialized. Log file: %s", log_file)
-    return logger
 
 
 def confirm(prompt):
@@ -45,7 +34,7 @@ DEFAULT_PROJECTS_DIR = os.path.join(
     os.getenv("DEFAULT_PROJECTS_DIR", os.path.expanduser("~/Coding")), "projects"
 )
 
-logger = setup_logging()
+logger = setup_logging(log_file="project_generator.log")
 
 
 def check_uv_installed():
@@ -221,6 +210,7 @@ def create_gitignore():
     """Create a comprehensive .gitignore file."""
     Path(".gitignore").write_text("""# Python
 __pycache__/
+.rufff_cache
 *.py[cod]
 *$py.class
 *.so

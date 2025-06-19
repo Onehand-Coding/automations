@@ -1,5 +1,6 @@
 *.sublime-*
 __pycache__/
+.ruff_cache
 resources/
 data/
 logs/

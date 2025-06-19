@@ -21,7 +21,7 @@ class WireGuardActivator:
         self.configs = []
         self.sudo_authenticated = False
         self.logger = setup_logging(
-            log_file=f"wireguard_activator_{datetime.now().strftime('%Y%m%d')}.log"
+            log_file="wireguard_activator_.log"
         )
 
     def authenticate_sudo(self):
