@@ -6,11 +6,9 @@ A robust tool for cloning websites with comprehensive logging and error handling
 Supports multiple URLs and customizable output directories.
 """
 
-import os
 import sys
 import time
 import shutil
-import logging
 import argparse
 import subprocess
 from pathlib import Path

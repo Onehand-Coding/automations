@@ -8,7 +8,6 @@ initializes a Git repository, and supports both uv and standard pip/venv workflo
 
 import os
 import sys
-import logging
 import argparse
 import subprocess
 import venv

@@ -4,10 +4,8 @@ import sys
 import json  # Needed for parsing rclone lsjson output
 import pickle  # Needed for GDrive token
 import shutil
-import logging
 import argparse
 import subprocess
-import logging.handlers
 from pathlib import Path
 from datetime import datetime
 
@@ -16,7 +14,7 @@ from dotenv import load_dotenv
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-from helper import ROOT_DIR, DATA_DIR, setup_logging
+from helper import DATA_DIR, setup_logging
 
 # --- Google Drive Upload Imports ---
 try:
@@ -349,14 +347,14 @@ def upload_to_gdrive(local_file_path, target_filename=None):
         file_id = file.get("id")
         file_name = file.get("name")
         file_link = file.get("webViewLink")
-        logger.info(f"✓ Google Drive upload successful!")
+        logger.info("✓ Google Drive upload successful!")
         logger.info(f"  File Name: {file_name}")
         logger.info(f"  File ID: {file_id}")
         logger.info(f"  View Link: {file_link}")
         return True  # Indicate success
 
     except Exception as e:
-        logger.exception(f"An unexpected error occurred during Google Drive upload")
+        logger.exception("An unexpected error occurred during Google Drive upload")
         send_notification(
             "Upload FAILED (GDrive - unexpected)", f"Error: {e}\nCheck logs."
         )
@@ -373,7 +371,7 @@ def create_backup(db_url, backup_dir=BACKUP_DB_DIR):
     logger.info(f"Attempting PostgreSQL backup to {backup_file}...")
     try:
         pg_dump_cmd = ["pg_dump", "-Fc", "-v", "-d", db_url, "-f", str(backup_file)]
-        logger.info(f"Executing pg_dump command...")
+        logger.info("Executing pg_dump command...")
         # Use stderr=subprocess.PIPE for pg_dump's verbose output
         result = subprocess.run(
             pg_dump_cmd, check=True, capture_output=True, text=True, encoding="utf-8"
@@ -424,7 +422,7 @@ def restore_backup(db_url, backup_file):
             db_url,
             str(backup_file_path),
         ]
-        logger.info(f"Executing pg_restore command...")
+        logger.info("Executing pg_restore command...")
         # pg_restore verbose output goes to stdout
         result = subprocess.run(
             pg_restore_cmd, check=True, capture_output=True, text=True, encoding="utf-8"
@@ -490,7 +488,7 @@ def send_notification(subject, body):
         logger.error(
             "Failed to send email: SMTP Authentication failed. Check credentials."
         )
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to send email due to an unexpected error.")
 
 

@@ -3,15 +3,13 @@
 import argparse
 import json
 import logging
-import os
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 from tqdm import tqdm
-from stat import S_ISREG  # Needed for the OSError handling refinement
 from datetime import datetime
-from datetime import datetime, timezone
+from datetime import timezone
 
 from helper import LOG_DIR
 

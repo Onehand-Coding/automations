@@ -1,7 +1,6 @@
 import sys
 import logging
 from pathlib import Path
-from typing import List, Dict, Set, Optional, Union, Tuple
 
 # Create folders using pathlib, which handles errors gracefully
 ROOT_DIR = Path(__file__).parent.parent.parent

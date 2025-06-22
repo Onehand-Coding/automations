@@ -1,9 +1,8 @@
 import re
-import sys
 import platform
 import subprocess
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict
 
 from helper import write_to_json, read_print_json, DATA_DIR
 

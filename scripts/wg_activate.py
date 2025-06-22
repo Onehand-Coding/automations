@@ -4,13 +4,11 @@ WireGuard Configuration Activator - Fixed Version
 A robust script to activate WireGuard configurations with better sudo handling.
 """
 
-import os
 import sys
 import logging
 import subprocess
 import time
 from pathlib import Path
-from datetime import datetime
 
 from helper import setup_logging
 
@@ -144,7 +142,7 @@ class WireGuardActivator:
             status, _ = self.check_interface_status(interface_name)
             print(f"{i:2d}. {interface_name:<20} {status}")
 
-        print(f"\n 0. Exit")
+        print("\n 0. Exit")
         print("=" * 60)
 
     def get_user_input(self, prompt):

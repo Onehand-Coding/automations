@@ -20,8 +20,7 @@ import argparse
 import tempfile
 import subprocess
 import urllib.request
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Optional
 
 from helper import setup_logging
 

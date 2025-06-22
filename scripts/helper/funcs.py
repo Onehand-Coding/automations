@@ -1,9 +1,8 @@
 import csv
 import json
-import logging
 from pathlib import Path
 from datetime import datetime
-from typing import List, Dict, Any, Union, Optional, Callable
+from typing import List, Dict, Any, Union, Optional
 
 
 def confirm(
