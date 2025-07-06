@@ -1,122 +1,186 @@
-# Personal Automation Scripts
+# ⚙️ Automations CLI
 
-This repository contains a collection of Python scripts designed to automate various tasks. These were developed as practice exercises and utility tools.
+A powerful, all-in-one command-line tool built with Python to automate everyday development and file management tasks.
 
-## Overview
+## ✨ Features
 
-The goal of this project is to explore different aspects of Python programming by creating practical automation solutions for everyday tasks, ranging from file management and backups to development workflow enhancements.
+* **Project Scaffolding**: Instantly create new Python projects with a standardized directory structure
+* **Database Management**: Automate PostgreSQL database backups and restores
+* **Cloud Sync**: Upload database backups directly to any `rclone` remote or Google Drive
+* **File Organization**: Clean up directories by sorting files based on their type and name
+* **System Utilities**: Retrieve saved Wi-Fi passwords, manage WireGuard VPN connections, or automatically install the correct `chromedriver` for your browser
+* **Google Photos**: Organize Google Photos Takeout archives
+* **Website Cloning**: Clone websites for offline viewing
+* **Wayfay Integration**: Custom workflow automation
 
-## Scripts Included
+## 🚀 Installation
 
-Here's a breakdown of the main scripts available in the `scripts/` directory:
+This tool is designed to be installed and run from a dedicated Python virtual environment using `uv`.
 
-### 1. PostgreSQL Backup Tool (`pg_backup_tool.py`)
+**Prerequisites:**
 
-* **Purpose:** Automates the backup and restore process for PostgreSQL databases.
-* **Features:**
-    * Creates PostgreSQL database dumps (`pg_dump`).
-    * Restores databases from dump files (`pg_restore`).
-    * Supports uploading backups to cloud storage using:
-        * **rclone** (Default): Uploads to any rclone-configured remote (e.g., Google Drive, S3, etc.). Requires rclone to be installed and configured.
-        * **Google Drive API**: Uploads directly to Google Drive. Requires Google Cloud credentials (`credentials.json`) and initial OAuth2 authentication.
-    * Finds and downloads the latest backup from an rclone remote for restoration.
-    * Sends email notifications for backup/restore success or failure.
-    * Configurable via command-line arguments and `.env` file.
-* **Usage:** Run from the command line, specifying an action (`backup`, `restore`, `list`) and other options. Example:
-    ```bash
-    python scripts/pg_backup_tool.py backup --upload --upload-method rclone --rclone-remote MyGdriveRemote
-    python scripts/pg_backup_tool.py restore --db-url <your_restore_db_url>
-    python scripts/pg_backup_tool.py restore --backup-file data/pg_backups/db/db_backup_YYYYMMDD_HHMMSS.dump
-    ```
+* Python 3.9+
+* `git`
+* [uv](https://github.com/astral-sh/uv) (recommended)
+* External Tools (for certain commands):
+    * `rclone`
+    * `exiftool`
+    * `pg_dump` & `pg_restore`
 
-### 2. Google Photos Takeout Organizer (`gphotos_takeout_organizer.py`)
+**Steps:**
 
-* **Purpose:** Processes extracted Google Photos Takeout archives, embedding metadata from JSON sidecar files into the corresponding image/video files.
-* **Features:**
-    * Recursively finds media files (JPG, PNG, MP4, MOV, etc.) and their matching JSON files within the Takeout structure.
-    * Uses `exiftool` (must be installed separately) to embed metadata (like timestamps, descriptions, locations) from the JSON into the media files.
-    * Handles various Google Photos naming conventions (e.g., `(edited)`, `(#)` suffixes).
-    * Optionally deletes JSON files after successful metadata embedding.
-    * Includes dry-run mode and verbose logging.
-* **Usage:**
-    ```bash
-    # Ensure exiftool is installed
-    python scripts/gphotos_takeout_organizer.py /path/to/google-photos-takeout --delete-json --verbose
-    python scripts/gphotos_takeout_organizer.py /path/to/takeout --dry-run
-    ```
+1. **Clone the repository:**
 
-### 3. File Organizer (`file_organizer.py`)
+   ```sh
+   git clone https://github.com/Phoenix1025/automations.git
+   cd automations
+   ```
 
-* **Purpose:** Sorts files within a specified directory based on various criteria.
-* **Features:**
-    * **Simple Sort:** Organizes files into subfolders based on their file extension (e.g., `.jpg`, `.pdf`) and then optionally by the first word (prefix) in their filename.
-    * **Aggressive Sort:** A more complex sort that organizes by file type (Video, Audio, Image, etc.), then by extension, then attempts to group files by common prefixes and common word sequences (stems) in their filenames.
-    * Moves empty folders to the system trash after sorting (for Aggressive sort).
-    * Uses a `helper` module for common functions.
-* **Usage:**
-    ```bash
-    python scripts/file_organizer.py /path/to/organize --method [agressive|simple] # Deefault is agressive
-    ```
+2. **Create and activate a virtual environment:**
 
-### 4. Python Project Generator (`project_generator.py`)
+   ```sh
+   uv venv
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   ```
 
-* **Purpose:** Quickly scaffolds a new Python project structure.
-* **Features:**
-    * Creates a standard project layout including a main package directory, `__init__.py`, `main.py`, `setup.py`, `README.md`, `.gitignore`, and an empty `requirements.txt`.
-    * Initializes a Git repository.
-    * Creates a Python virtual environment (`.venv`).
-    * Generates a basic `.sublime-project` file with LSP settings (optional).
-    * Optionally opens the created project in Sublime Text.
-* **Usage:**
-    ```bash
-    python scripts/project_generator.py --name my-new-project --path /path/to/projects --open
-    python scripts/project_generator.py # Interactive mode
-    ```
+3. **Install the tool:**
+   This command uses `pyproject.toml` to install the tool and all its dependencies, making the `automations` command available.
 
-### 5. WiFi Password Retriever (`wayfay.py`)
+   ```sh
+   uv pip install -e .
+   ```
 
-* **Purpose:** Retrieves and displays saved WiFi network SSIDs and their passwords from the system (requires administrative privileges on some OS).
-* **Features:**
-    * Supports Windows (`netsh`), macOS (`security`), and Linux (`nmcli` or NetworkManager files).
-    * Extracts SSIDs and attempts to retrieve corresponding passwords.
-    * Saves the retrieved information to `scripts/data/wifi_passwords.json`.
-* **Usage:**
-    ```bash
-    # May need to run with sudo on Linux/macOS for password access
-    python scripts/wayfay.py
-    ```
+## 🛠️ Configuration
 
-### Helper Module (`helper/funcs.py`)
+For commands that require credentials or specific paths, create a `.env` file in the project's root directory.
 
-* Contains common utility functions used by other scripts, such as user confirmation prompts, path handling, JSON/CSV operations, and logging configuration.
+* **PostgreSQL Backups (`pg-backup`)**:
+  ```env
+  # Your database connection string
+  DB_URL="postgresql://user:password@host:port/dbname"
 
-## Setup
+  # rclone remote name for uploads
+  RCLONE_REMOTE_NAME="MyGdrive"
 
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/Phoenix1025/automations.git
-    cd automations
-    ```
-2.  **Create and activate a virtual environment:** (Recommended)
-    ```bash
-    python -m venv .venv
-    # On Windows:
-    # .venv\Scripts\activate
-    # On Linux/macOS:
-    # source .venv/bin/activate
-    ```
-3.  **Install dependencies:**
-    ```bash
-    pip install -r requirements.txt
-    ```
-4.  **Install External Tools (if needed):**
-    * **rclone:** Required for the `rclone` upload method in `pg_backup_tool.py`. Follow instructions at [rclone.org](https://rclone.org/install/).
-    * **exiftool:** Required for `gphotos_takeout_organizer.py`. Follow instructions at [exiftool.org](https://exiftool.org/install.html).
-    * **PostgreSQL Client Tools:** `pg_dump` and `pg_restore` are required for `pg_backup_tool.py`. Install the PostgreSQL client utilities appropriate for your operating system.
-5.  **Configuration:**
-    * **`pg_backup_tool.py`:** Create a `.env` file in the `automations` root directory to store database URLs, email settings, and default rclone remote names. See the script for environment variables used (e.g., `DB_URL`, `EMAIL_FROM`, `SMTP_PASSWORD`, `RCLONE_REMOTE_NAME`).
-    * **Google Drive Upload (`pg_backup_tool.py`)**: Place your `credentials.json` file (from Google Cloud Console) inside the `scripts/` directory. Run the script once with `--upload-method gdrive` to perform the initial OAuth authentication.
+  # Email notification settings (optional)
+  EMAIL_FROM="your-email@example.com"
+  EMAIL_TO="recipient@example.com"
+  SMTP_SERVER="smtp.example.com"
+  SMTP_PORT="587"
+  SMTP_USERNAME="your-username"
+  SMTP_PASSWORD="your-app-password"
+  ```
 
-## Contributing
+* **Google Drive API**:
+  For the `pg-backup` command to use the `gdrive` upload method, place your `credentials.json` file (from Google Cloud Console) in the `data/backup-tool/` directory.
+
+## 📋 Usage
+
+All functionality is accessed through the main `automations` command.
+
+```sh
+# See a list of all available commands
+automations --help
+```
+
+### Commands Overview
+
+| Command | Description |
+|---------|-------------|
+| `project-generator` | Scaffolds a new Python project directory |
+| `pg-backup` | Backs up, restores, or lists PostgreSQL database dumps |
+| `file-organizer` | Sorts files in a directory into subfolders |
+| `gphotos-takeout-organizer` | Organizes a Google Photos Takeout archive |
+| `install-chromedriver` | Installs the correct `chromedriver` for your browser |
+| `wg-activate` | Interactively manage WireGuard VPN connections |
+| `wayfay` | Custom workflow automation |
+| `website-cloner` | Clones a website for offline viewing |
+
+### Command Examples
+
+* **Create a new project:**
+  ```sh
+  automations project-generator my-new-app
+  ```
+
+* **Backup a database and upload it:**
+  ```sh
+  automations pg-backup backup --upload --upload-method rclone
+  ```
+
+* **Restore the latest backup from the cloud:**
+  ```sh
+  # This will prompt you to download the latest backup from your rclone remote
+  automations pg-backup restore
+  ```
+
+* **Install ChromeDriver automatically (requires sudo):**
+  ```sh
+  automations install-chromedriver
+  ```
+
+* **Organize your Downloads folder:**
+  ```sh
+  automations file-organizer ~/Downloads
+  ```
+
+* **Organize Google Photos Takeout:**
+  ```sh
+  automations gphotos-takeout-organizer /path/to/takeout-archive
+  ```
+
+* **Manage WireGuard connections:**
+  ```sh
+  automations wg-activate
+  ```
+
+* **Clone a website:**
+  ```sh
+  automations website-cloner https://example.com
+  ```
+
+## 📁 Project Structure
+
+```
+automations/
+├── automations_cli/           # Main package
+│   ├── commands/             # Command implementations
+│   │   ├── helper/          # Shared utilities
+│   │   │   ├── configs.py   # Configuration helpers
+│   │   │   └── funcs.py     # Common functions
+│   │   ├── file_organizer.py
+│   │   ├── gphotos_takeout_organizer.py
+│   │   ├── install_chromedriver.py
+│   │   ├── pg_backup_tool.py
+│   │   ├── project_generator.py
+│   │   ├── wayfay.py
+│   │   ├── website_cloner.py
+│   │   └── wg_activate.py
+│   └── main.py              # CLI entry point
+├── data/                    # Application data
+│   ├── backup-tool/         # Database backups & credentials
+│   └── wifi_passwords.json  # Stored Wi-Fi passwords
+├── logs/                    # Application logs
+├── pyproject.toml          # Project configuration
+├── requirements.txt        # Python dependencies
+└── uv.lock                # UV lock file
+```
+
+## 🔧 Development
+
+To contribute or modify the tool:
+
+1. **Fork and clone the repository**
+2. **Set up the development environment:**
+   ```sh
+   uv venv
+   source .venv/bin/activate
+   uv pip install -e .
+   ```
+3. **Make your changes** in the `automations_cli/` directory
+4. **Test your changes** by running the CLI commands
+5. **Submit a pull request**
+
+## 🤝 Contributing
 
 This repository is primarily for personal learning and utility. However, suggestions or improvements are welcome. Feel free to open an issue or submit a pull request.

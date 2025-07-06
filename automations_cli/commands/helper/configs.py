@@ -2,8 +2,35 @@ import sys
 import logging
 from pathlib import Path
 
+
 # Create folders using pathlib, which handles errors gracefully
-ROOT_DIR = Path(__file__).parent.parent.parent
+def find_project_root(marker: str = "pyproject.toml") -> Path:
+    """
+    Dynamically finds the project root by searching upwards for a marker file.
+
+    Args:
+        marker: The file that identifies the project root.
+
+    Returns:
+        A Path object to the project root directory.
+
+    Raises:
+        FileNotFoundError: If the project root cannot be determined.
+    """
+    current_path = Path(__file__).resolve()  # Start from the current file's location
+    while current_path != current_path.parent:  # Loop until we hit the filesystem root
+        if (current_path / marker).exists():
+            return current_path
+        current_path = current_path.parent
+    raise FileNotFoundError(f"Project root marker '{marker}' not found.")
+
+
+# --- CONSTANTS ---
+try:
+    ROOT_DIR = find_project_root()
+except FileNotFoundError as e:
+    print(f"FATAL ERROR: {e}")
+    sys.exit(1)
 
 DATA_DIR = ROOT_DIR / "data"
 DATA_DIR.mkdir(exist_ok=True)

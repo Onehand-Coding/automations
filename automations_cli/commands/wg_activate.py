@@ -18,9 +18,7 @@ class WireGuardActivator:
         self.config_dir = Path(config_dir)
         self.configs = []
         self.sudo_authenticated = False
-        self.logger = setup_logging(
-            log_file="wireguard_activator_.log"
-        )
+        self.logger = setup_logging(log_file="wireguard_activator_.log")
 
     def authenticate_sudo(self):
         """Authenticate sudo once at the beginning to avoid repeated prompts."""
