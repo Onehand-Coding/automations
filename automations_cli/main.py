@@ -176,5 +176,98 @@ def pg_backup(
     _run_script("pg_backup_tool.py", args)
 
 
+@app.command()
+def download_video(
+    url: Optional[str] = typer.Argument(
+        None, help="The URL of the video to download or list formats for."
+    ),
+    output_name: Optional[str] = typer.Argument(None, help="Optional output filename."),
+    quality: Optional[str] = typer.Option(
+        "best",
+        "--quality",
+        "-q",
+        help="Set video quality (e.g., '1080p', '720p', 'best').",
+    ),
+    list_formats: bool = typer.Option(
+        False,
+        "--list-formats",
+        "-l",
+        help="List available formats for the URL instead of downloading.",
+    ),
+    playlist_mode: str = typer.Option(
+        "download_all",
+        "--playlist-mode",
+        "-p",
+        help="Playlist handling: download_all, single, first_n, audio_only.",
+    ),
+    items: Optional[str] = typer.Option(
+        None,
+        "--items",
+        "-i",
+        help="Download specific items from a playlist (e.g., '5', '2-4,8'). Works with --playlist-mode audio_only.",
+    ),
+    create_config: bool = typer.Option(
+        False, "--create-config", help="Create a default configuration file and exit."
+    ),
+    no_config: bool = typer.Option(
+        False, "--no-config", help="Run without loading settings from the config file."
+    ),
+    browser: Optional[str] = typer.Option(
+        None,
+        "--browser",
+        "-b",
+        help="Browser to use for cookies (brave, chrome, firefox, etc.).",
+    ),
+    archive: Optional[Path] = typer.Option(
+        None,
+        "--archive",
+        help="Path to a download archive file to record downloaded files.",
+    ),
+):
+    """
+    Downloads video or audio from a URL using yt-dlp, with advanced options.
+    """
+    args = []
+
+    # Handle standalone commands first
+    if create_config:
+        args.append("--create-config")
+        _run_script("video_downloader.py", args)
+        return
+
+    # A URL is required for any other action
+    if not url:
+        print("❌ Error: A URL is required unless using '--create-config'.")
+        raise typer.Exit(1)
+
+    args.append(url)
+
+    if list_formats:
+        args.append("--list-formats")
+        _run_script("video_downloader.py", args)
+        return
+
+    # For downloads, add the remaining arguments
+    if output_name:
+        args.append(output_name)
+
+    args.extend(["--quality", quality])
+    args.extend(["--playlist-mode", playlist_mode])
+
+    if no_config:
+        args.append("--no-config")
+
+    if items:
+        args.extend(["--items", items])
+
+    if browser:
+        args.extend(["--browser", browser])
+
+    if archive:
+        args.extend(["--archive", str(archive)])
+
+    _run_script("video_downloader.py", args)
+
+
 if __name__ == "__main__":
     app()
