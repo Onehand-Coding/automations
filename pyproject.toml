@@ -14,8 +14,7 @@ dependencies = [
     # Pinning typer and click to known compatible versions
     "typer==0.9.0",
     "click==8.1.7",
-
-    # The rest of your dependencies
+    "pysrt",
     "beautifulsoup4",
     "cachetools",
     "certifi",
@@ -45,6 +44,7 @@ dependencies = [
     "tqdm",
     "uritemplate",
     "urllib3",
+    "ffsubsync>=0.4.29",
 ]
 
 [project.scripts]

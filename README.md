@@ -11,7 +11,8 @@ A powerful, all-in-one command-line tool built with Python to automate everyday 
 * **System Utilities**: Retrieve saved Wi-Fi passwords, manage WireGuard VPN connections, or automatically install the correct `chromedriver` for your browser
 * **Google Photos**: Organize Google Photos Takeout archives
 * **Website Cloning**: Clone websites for offline viewing
-* **Wayfay Integration**: Custom workflow automation
+* **Video Downloading**: Download videos or audio from URLs using yt-dlp with advanced options
+* **Subtitle Management**: Sync, shift, and embed subtitles into video files
 
 ## 🚀 Installation
 
@@ -26,6 +27,8 @@ This tool is designed to be installed and run from a dedicated Python virtual en
     * `rclone`
     * `exiftool`
     * `pg_dump` & `pg_restore`
+    * `yt-dlp`
+    * `ffmpeg` (for subtitle and video operations)
 
 **Steps:**
 
@@ -87,20 +90,22 @@ automations --help
 
 | Command | Description |
 |---------|-------------|
-| `project-generator` | Scaffolds a new Python project directory |
-| `pg-backup` | Backs up, restores, or lists PostgreSQL database dumps |
-| `file-organizer` | Sorts files in a directory into subfolders |
-| `gphotos-takeout-organizer` | Organizes a Google Photos Takeout archive |
-| `install-chromedriver` | Installs the correct `chromedriver` for your browser |
-| `wg-activate` | Interactively manage WireGuard VPN connections |
-| `wayfay` | Custom workflow automation |
-| `website-cloner` | Clones a website for offline viewing |
+| `clone-website` | Clones a website for offline viewing |
+| `download-video` | Downloads video or audio from a URL using yt-dlp |
+| `generate-project` | Generates a new project directory structure |
+| `get-wifi-passwords` | Retrieves known Wi-Fi SSIDs and passwords |
+| `install-chromedriver` | Downloads and installs the correct ChromeDriver |
+| `organize-files` | Organizes files into subfolders based on extension |
+| `pg-backup` | PostgreSQL Backup/Restore Tool with Cloud Upload |
+| `process-takeout` | Organizes a Google Photos Takeout archive |
+| `run-wireguard` | Interactive tool to activate and manage WireGuard VPN connections |
+| `subtitle` | Tools for shifting, syncing, and embedding subtitles |
 
 ### Command Examples
 
 * **Create a new project:**
   ```sh
-  automations project-generator my-new-app
+  automations generate-project my-new-app
   ```
 
 * **Backup a database and upload it:**
@@ -121,22 +126,49 @@ automations --help
 
 * **Organize your Downloads folder:**
   ```sh
-  automations file-organizer ~/Downloads
+  automations organize-files ~/Downloads
   ```
 
 * **Organize Google Photos Takeout:**
   ```sh
-  automations gphotos-takeout-organizer /path/to/takeout-archive
+  automations process-takeout /path/to/takeout-archive
   ```
 
 * **Manage WireGuard connections:**
   ```sh
-  automations wg-activate
+  automations run-wireguard
   ```
 
 * **Clone a website:**
   ```sh
-  automations website-cloner https://example.com
+  automations clone-website https://example.com
+  ```
+
+* **Download a video:**
+  ```sh
+  # Download best quality
+  automations download-video https://example.com/video
+
+  # Download specific quality
+  automations download-video https://example.com/video -q 720p
+
+  # List available formats
+  automations download-video https://example.com/video --list-formats
+  ```
+
+* **Subtitle operations:**
+  ```sh
+  # Sync subtitles to video using audio analysis
+  automations subtitle sync video.mp4 subtitles.srt synced_subtitles.srt
+
+  # Shift subtitle timing
+  automations subtitle shift subtitles.srt shifted_subtitles.srt --offset -2.5
+
+  # Embed subtitles into video (soft subtitles)
+  automations subtitle embed video.mp4 subtitles.srt output_video.mp4
+
+  # Embed hard subtitles (burned into video)
+  automations subtitle embed video.mp4 subtitles.srt output_video.mp4 --hard
   ```
 
 ## 📁 Project Structure
@@ -153,6 +185,8 @@ automations/
 │   │   ├── install_chromedriver.py
 │   │   ├── pg_backup_tool.py
 │   │   ├── project_generator.py
+│   │   ├── subtitle_manager.py
+│   │   ├── video_downloader.py
 │   │   ├── wayfay.py
 │   │   ├── website_cloner.py
 │   │   └── wg_activate.py

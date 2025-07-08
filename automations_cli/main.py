@@ -12,6 +12,14 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 
+# Dedicated Typer app for the subtitle commands
+subtitle_app = typer.Typer(
+    name="subtitle", help="Tools for shifting and embedding subtitles."
+)
+
+# Add the new subtitle app to main app
+app.add_typer(subtitle_app)
+
 
 # --- Helper Function to Run Scripts ---
 def _run_script(script_name: str, args: list[str] = [], use_sudo: bool = False):
@@ -267,6 +275,61 @@ def download_video(
         args.extend(["--archive", str(archive)])
 
     _run_script("video_downloader.py", args)
+
+
+@subtitle_app.command("sync")
+def subtitle_sync(
+    video_path: Path = typer.Argument(..., help="Path to the reference video file."),
+    input_srt: Path = typer.Argument(..., help="Path to the out-of-sync .srt file."),
+    output_srt: Path = typer.Argument(..., help="Path for the new, synced .srt file."),
+):
+    """Automatically syncs subtitles to a video using audio analysis."""
+    _run_script(
+        "subtitle_manager.py",
+        ["sync", str(video_path), str(input_srt), str(output_srt)],
+    )
+
+
+@subtitle_app.command("shift")
+def subtitle_shift(
+    input_srt: Path = typer.Argument(..., help="Path to the original .srt file."),
+    output_srt: Path = typer.Argument(..., help="Path for the new, shifted .srt file."),
+    # Changed from string to float to match the new function
+    offset: float = typer.Option(
+        ..., "--offset", "-o", help="Time offset in seconds (e.g., -13.0)."
+    ),
+):
+    """Creates a new, time-shifted subtitle file using pysrt."""
+    _run_script(
+        "subtitle_manager.py",
+        ["shift", str(input_srt), str(output_srt), "--offset", str(offset)],
+    )
+
+
+@subtitle_app.command("embed")
+def subtitle_embed(
+    video_path: Path = typer.Argument(..., help="Path to the input video file."),
+    subtitle_path: Path = typer.Argument(..., help="Path to the .srt subtitle file."),
+    output_path: Path = typer.Argument(..., help="Path for the new output video file."),
+    offset: float = typer.Option(
+        0.0, "--offset", "-o", help="Offset in seconds for soft subtitles."
+    ),
+    hard_sub: bool = typer.Option(
+        False, "--hard", help="Burn subtitles into the video (slower, permanent)."
+    ),
+):
+    """Embeds subtitles into a video file (softsub by default)."""
+    args = [
+        "embed",
+        str(video_path),
+        str(subtitle_path),
+        str(output_path),
+        "--offset",
+        str(offset),
+    ]
+    if hard_sub:
+        args.append("--hard")
+    _run_script("subtitle_manager.py", args)
 
 
 if __name__ == "__main__":
