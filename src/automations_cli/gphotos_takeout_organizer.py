@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-
-import argparse
-import json
-import logging
-import shutil
-import subprocess
 import sys
+import json
+import shutil
+import logging
+import argparse
+import subprocess
 from pathlib import Path
-from tqdm import tqdm
 from datetime import datetime
 from datetime import timezone
+
+from tqdm import tqdm
 
 from helper import LOG_DIR
 

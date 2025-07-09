@@ -1,8 +1,10 @@
+#!/usr/bin/env python3
 import sys
-import typer
 import subprocess
 from pathlib import Path
 from typing import Optional, List
+
+import typer
 
 # The main Typer application
 app = typer.Typer(
@@ -26,7 +28,7 @@ def _run_script(script_name: str, args: list[str] = [], use_sudo: bool = False):
     """Finds and runs a script from the 'commands' directory."""
     python_executable = sys.executable
     cli_dir = Path(__file__).parent
-    script_path = cli_dir / "commands" / script_name
+    script_path = cli_dir / script_name
 
     if not script_path.exists():
         typer.secho(
@@ -331,7 +333,7 @@ def subtitle_embed(
 
 
 @app.command()
-def docs_generator(
+def generate_docs(
     dir: str = typer.Option(
         ".",
         "--dir",

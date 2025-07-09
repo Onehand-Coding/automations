@@ -1,13 +1,14 @@
+#!/usr/bin/env python3
+import re
 import sys
 import json
 import shutil
 import argparse
 import subprocess
-from pathlib import Path
-from typing import Optional, Dict, Any
-import re
 import configparser
+from pathlib import Path
 from urllib.parse import urlparse
+from typing import Optional, Dict, Any
 
 try:
     from helper.configs import setup_logging

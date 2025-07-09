@@ -1,13 +1,4 @@
 #!/usr/bin/env python3
-"""
-ChromeDriver Auto-Installer
---------------------------
-Automatically detects the installed Brave/Chrome/Chromium browser version
-and downloads the appropriate ChromeDriver to match.
-
-Usage: sudo python3 install_chromedriver.py [--force] [--browser chrome|brave|chromium] [--dry-run]
-"""
-
 import os
 import re
 import sys

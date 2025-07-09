@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 import os
 import sys
-import json  # Needed for parsing rclone lsjson output
-import pickle  # Needed for GDrive token
+import json
+import pickle
 import shutil
+import smtplib
 import argparse
 import subprocess
 from pathlib import Path
 from datetime import datetime
-
-import smtplib
-from dotenv import load_dotenv
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+
+from dotenv import load_dotenv
 
 from helper import DATA_DIR, setup_logging
 

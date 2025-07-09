@@ -1,11 +1,4 @@
 #!/usr/bin/env python3
-"""
-Website Cloner using HTTrack
-
-A robust tool for cloning websites with comprehensive logging and error handling.
-Supports multiple URLs and customizable output directories.
-"""
-
 import sys
 import time
 import shutil

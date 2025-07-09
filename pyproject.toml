@@ -11,41 +11,19 @@ readme = "README.md"
 requires-python = ">=3.9"
 
 dependencies = [
-    # Pinning typer and click to known compatible versions
     "typer==0.9.0",
     "click==8.1.7",
     "pysrt",
-    "beautifulsoup4",
-    "cachetools",
-    "certifi",
-    "cffi",
-    "charset-normalizer",
-    "cryptography",
+    "send2trash",
+    "tqdm",
+    "ffsubsync",
     "google-api-python-client",
     "google-auth-oauthlib",
-    "httplib2",
-    "idna",
-    "oauth2client",
-    "piexif",
-    "pillow",
-    "protobuf",
-    "pyasn1",
-    "pyasn1-modules",
-    "pycparser",
-    "pyopenssl",
-    "pyparsing",
-    "pyperclip",
-    "python-dotenv",
-    "pyyaml",
-    "requests",
-    "rsa",
-    "send2trash",
-    "six",
-    "tqdm",
-    "uritemplate",
-    "urllib3",
-    "ffsubsync>=0.4.29",
+    "google-auth",
 ]
 
 [project.scripts]
 automations = "automations_cli.main:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/automations_cli"]

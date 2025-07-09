@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import os
 import re
 import sys
@@ -5,9 +6,9 @@ import shutil
 import argparse
 from enum import Enum
 from pathlib import Path
-from typing import List, Dict, Set, Optional, Union
 from collections import defaultdict
 from itertools import combinations, zip_longest
+from typing import List, Dict, Set, Optional, Union
 
 from send2trash import send2trash
 
@@ -294,7 +295,7 @@ class FileOrganizer:
 
         logger.info("Verifying files...")
         verify_files(
-            unsorted_files, self.get_files(), empty_folders, method="Aggressive"
+            unsorted_files, self.get_files(), empty_folders, method="Recursive"
         )
 
 

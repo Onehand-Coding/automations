@@ -1,22 +1,12 @@
 #!/usr/bin/env python3
-"""
-Python Project Generator
-
-This script creates a new Python project with all necessary files,
-initializes a Git repository, and supports both uv and standard pip/venv workflows.
-"""
-
 import os
 import sys
+import venv
 import argparse
 import subprocess
-import venv
 from pathlib import Path
 
 from helper import setup_logging
-
-# Assuming 'helper.py' with a confirm function exists in the same directory or a reachable path.
-# from helper import confirm, setup_logging
 
 
 def confirm(prompt):

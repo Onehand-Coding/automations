@@ -1,13 +1,8 @@
 #!/usr/bin/env python3
-"""
-WireGuard Configuration Activator - Fixed Version
-A robust script to activate WireGuard configurations with better sudo handling.
-"""
-
 import sys
+import time
 import logging
 import subprocess
-import time
 from pathlib import Path
 
 from helper import setup_logging
