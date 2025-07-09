@@ -17,7 +17,7 @@ subtitle_app = typer.Typer(
     name="subtitle", help="Tools for shifting and embedding subtitles."
 )
 
-# Add the new subtitle app to main app
+# Add dedicated apps to main app
 app.add_typer(subtitle_app)
 
 
@@ -49,8 +49,6 @@ def _run_script(script_name: str, args: list[str] = [], use_sudo: bool = False):
 
 
 # --- CLI Commands ---
-
-
 @app.command()
 def generate_project(
     project_name: str = typer.Argument(
@@ -330,6 +328,79 @@ def subtitle_embed(
     if hard_sub:
         args.append("--hard")
     _run_script("subtitle_manager.py", args)
+
+
+@app.command()
+def docs_generator(
+    dir: str = typer.Option(
+        ".",
+        "--dir",
+        help="Output directory for documentation files (default: current directory)",
+    ),
+    all: bool = typer.Option(
+        False,
+        "--all",
+        help="Generate all documentation files (README.md, LICENSE, pyproject.toml, .gitignore)",
+    ),
+    readme: bool = typer.Option(False, "--readme", help="Generate README.md"),
+    license: bool = typer.Option(False, "--license", help="Generate LICENSE"),
+    pyproject: bool = typer.Option(
+        False, "--pyproject", help="Generate pyproject.toml"
+    ),
+    gitignore: bool = typer.Option(False, "--gitignore", help="Generate .gitignore"),
+    project_name: str = typer.Option(
+        "my_project",
+        "--project-name",
+        help="Project name for README and pyproject.toml",
+    ),
+    package_name: Optional[str] = typer.Option(
+        None,
+        "--package-name",
+        help="Package name for pyproject.toml (defaults to project-name)",
+    ),
+    description: str = typer.Option(
+        "A Python project",
+        "--description",
+        help="Project description for README and pyproject.toml",
+    ),
+    author: str = typer.Option(
+        "Your Name", "--author", help="Author name for LICENSE and pyproject.toml"
+    ),
+    email: str = typer.Option(
+        "your.email@example.com", "--email", help="Author email for pyproject.toml"
+    ),
+    license_type: str = typer.Option(
+        "MIT", "--license-type", help="License type: MIT, Apache-2.0, GPL-3.0"
+    ),
+):
+    """Generates project documentation files (README.md, LICENSE, pyproject.toml, .gitignore)."""
+    args = [
+        "--dir",
+        dir,
+        "--project-name",
+        project_name,
+        "--description",
+        description,
+        "--author",
+        author,
+        "--email",
+        email,
+        "--license-type",
+        license_type,
+    ]
+    if all:
+        args.append("--all")
+    if readme:
+        args.append("--readme")
+    if license:
+        args.append("--license")
+    if pyproject:
+        args.append("--pyproject")
+    if gitignore:
+        args.append("--gitignore")
+    if package_name:
+        args.extend(["--package-name", package_name])
+    _run_script("docs_generator.py", args)
 
 
 if __name__ == "__main__":
