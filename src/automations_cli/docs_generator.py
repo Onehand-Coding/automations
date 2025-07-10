@@ -57,6 +57,23 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/{package_name}"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "ruff>=0.3.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py38"
+
+[project.scripts]
+run-project = "{package_name}.main:main"
 """
 
 GITIGNORE_TEMPLATE = """# Python
@@ -74,13 +91,13 @@ dist/
 *.egg-info/
 
 # Logs
+logs/
 *.log
 
 # IDEs and editors
 .vscode/
 .idea/
-*.sublime-project
-*.sublime-workspace
+*.sublime-*
 
 # OS generated files
 .DS_Store
@@ -90,6 +107,10 @@ Thumbs.db
 .coverage
 coverage.xml
 *.cover
+
+# Cache
+.ruff_cache/
+.pytest_cache/
 """
 
 LICENSE_TEMPLATES = {
