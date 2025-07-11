@@ -4,7 +4,8 @@ A powerful, all-in-one command-line tool built with Python to automate everyday 
 
 ## ✨ Features
 
-* **Project Scaffolding**: Instantly create new Python projects with a standardized directory structure
+* **Project Scaffolding**: Instantly create new Python projects with a standardized directory structure, interactive mode, and flexible options
+* **Gist Management**: Upload, update, list, delete, and download GitHub Gists from the command line
 * **Database Management**: Automate PostgreSQL database backups and restores
 * **Cloud Sync**: Upload database backups directly to any `rclone` remote or Google Drive
 * **File Organization**: Clean up directories by sorting files based on their type and name
@@ -39,17 +40,18 @@ This tool is designed to be installed and run from a dedicated Python virtual en
    cd automations
    ```
 
-2. **Create and activate a virtual environment:**
-
-   ```sh
-   uv venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-   ```
-
-3. **Install the tool:**
+2. **Create, activate a virtual environment and Install the tool:**
    This command uses `pyproject.toml` to install the tool and all its dependencies, making the `automations` command available.
 
    ```sh
+   uv sync # All at once
+
+   # or
+
+   uv venv
+
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
    uv pip install -e .
    ```
 
@@ -59,6 +61,8 @@ For commands that require credentials or specific paths, create a `.env` file in
 
 * **PostgreSQL Backups (`pg-backup`)**:
   ```env
+  # === pg backup ===
+
   # Your database connection string
   DB_URL="postgresql://user:password@host:port/dbname"
 
@@ -77,6 +81,12 @@ For commands that require credentials or specific paths, create a `.env` file in
 * **Google Drive API**:
   For the `pg-backup` command to use the `gdrive` upload method, place your `credentials.json` file (from Google Cloud Console) in the `data/backup-tool/` directory.
 
+* **GitHub Gist Management**:
+  For all `gist` commands, set your GitHub token in a `.env` file or in `~/.gist`:
+  ```env
+  GITHUB_TOKEN=your_github_token
+  ```
+
 ## 📋 Usage
 
 All functionality is accessed through the main `automations` command.
@@ -88,117 +98,136 @@ automations --help
 
 ### Commands Overview
 
-| Command | Description |
-|---------|-------------|
-| `clone-website` | Clones a website for offline viewing |
-| `download-video` | Downloads video or audio from a URL using yt-dlp |
-| `generate-project` | Generates a new project directory structure |
-| `get-wifi-passwords` | Retrieves known Wi-Fi SSIDs and passwords |
-| `install-chromedriver` | Downloads and installs the correct ChromeDriver |
-| `organize-files` | Organizes files into subfolders based on extension |
-| `pg-backup` | PostgreSQL Backup/Restore Tool with Cloud Upload |
-| `process-takeout` | Organizes a Google Photos Takeout archive |
-| `run-wireguard` | Interactive tool to activate and manage WireGuard VPN connections |
-| `subtitle` | Tools for shifting, syncing, and embedding subtitles |
+| Command              | Description                                                                 |
+|----------------------|-----------------------------------------------------------------------------|
+| `clone-website`      | Clones a website for offline viewing                                        |
+| `download-video`     | Downloads video or audio from a URL using yt-dlp                            |
+|generate-docs         |Generates project documentation files (README.md, LICENSE,..)                |
+| `generate-project`   | Generates a new project directory structure (with interactive mode)         |
+| `get-wifi-passwords` | Retrieves known Wi-Fi SSIDs and passwords                                   |
+| `install-chromedriver` | Downloads and installs the correct ChromeDriver                           |
+| `organize-files`     | Organizes files into subfolders based on extension                          |
+| `pg-backup`          | PostgreSQL Backup/Restore Tool with Cloud Upload                            |
+| `process-takeout`    | Organizes a Google Photos Takeout archive                                   |
+| `run-wireguard`      | Interactive tool to activate and manage WireGuard VPN connections           |
+| `subtitle`           | Tools for shifting, syncing, and embedding subtitles                        |
+| `gist`               | Tools for managing GitHub Gists (upload, update, list, delete, download)    |
 
-### Command Examples
+---
 
-* **Create a new project:**
+## 🧑‍💻 Interactive Mode
+
+You can use `--interactive` with `generate-project` to be prompted for all options, making it easy to scaffold a new project without remembering flags.
+
+```sh
+automations generate-project --interactive
+```
+
+---
+
+## 📝 Gist Management
+
+Manage your GitHub Gists directly from the CLI:
+
+* **List your gists:**
   ```sh
-  automations generate-project my-new-app
+  automations gist list
   ```
 
-* **Backup a database and upload it:**
+* **Upload a file as a new gist:**
   ```sh
-  automations pg-backup backup --upload --upload-method rclone
+  automations gist upload myscript.py --description "My script"
   ```
 
-* **Restore the latest backup from the cloud:**
+* **Update an existing gist:**
   ```sh
-  # This will prompt you to download the latest backup from your rclone remote
-  automations pg-backup restore
+  automations gist update myscript.py --update <gist_id>
   ```
 
-* **Install ChromeDriver automatically (requires sudo):**
+* **Delete a gist:**
   ```sh
-  automations install-chromedriver
+  automations gist delete <gist_id>
   ```
 
-* **Organize your Downloads folder:**
+* **Download a gist by ID or URL:**
   ```sh
-  automations organize-files ~/Downloads
+  automations gist download <gist_id>
+  automations gist download <gist_id> --output-dir ~/Downloads
+  automations gist download https://gist.github.com/username/<gist_id>
   ```
 
-* **Organize Google Photos Takeout:**
+---
+
+## 🛠️ Project Generator Examples
+
+* **Create a new project interactively:**
   ```sh
-  automations process-takeout /path/to/takeout-archive
+  automations generate-project --interactive
   ```
 
-* **Manage WireGuard connections:**
+* **Create a new project without docs:**
   ```sh
-  automations run-wireguard
+  automations generate-project myproject --no-docs
   ```
 
-* **Clone a website:**
+* **Create a CLI tool project:**
   ```sh
-  automations clone-website https://example.com
+  automations generate-project mycli --type cli
   ```
 
-* **Download a video:**
-  ```sh
-  # Download best quality
-  automations download-video https://example.com/video
+---
 
-  # Download specific quality
-  automations download-video https://example.com/video -q 720p
-
-  # List available formats
-  automations download-video https://example.com/video --list-formats
-  ```
-
-* **Subtitle operations:**
-  ```sh
-  # Sync subtitles to video using audio analysis
-  automations subtitle sync video.mp4 subtitles.srt synced_subtitles.srt
-
-  # Shift subtitle timing
-  automations subtitle shift subtitles.srt shifted_subtitles.srt --offset -2.5
-
-  # Embed subtitles into video (soft subtitles)
-  automations subtitle embed video.mp4 subtitles.srt output_video.mp4
-
-  # Embed hard subtitles (burned into video)
-  automations subtitle embed video.mp4 subtitles.srt output_video.mp4 --hard
-  ```
-
-## 📁 Project Structure
+## 🗂️ Project Structure
 
 ```
 automations/
-├── automations_cli/           # Main package
-│   ├── commands/             # Command implementations
-│   │   ├── helper/          # Shared utilities
-│   │   │   ├── configs.py   # Configuration helpers
-│   │   │   └── funcs.py     # Common functions
-│   │   ├── file_organizer.py
-│   │   ├── gphotos_takeout_organizer.py
-│   │   ├── install_chromedriver.py
-│   │   ├── pg_backup_tool.py
-│   │   ├── project_generator.py
-│   │   ├── subtitle_manager.py
-│   │   ├── video_downloader.py
-│   │   ├── wayfay.py
-│   │   ├── website_cloner.py
-│   │   └── wg_activate.py
-│   └── main.py              # CLI entry point
+├── src/                     # Source code
+│   │
+│   └── automations_cli/     # Main package
+│       ├── __init__.py
+│       ├── main.py          # CLI entry point
+│       ├── helper/          # Shared utilities
+│       │   ├── __init__.py
+│       │   ├── configs.py   # Configuration helpers
+│       │   ├── funcs.py     # Common functions
+│       │   └── templates.py # Template utilities
+│       ├── docs_generator.py
+│       ├── file_organizer.py
+│       ├── gist_manager.py
+│       ├── gphotos_takeout_organizer.py
+│       ├── install_chromedriver.py
+│       ├── pg_backup_tool.py
+│       ├── project_generator.py
+│       ├── subtitle_manager.py
+│       ├── video_downloader.py
+│       ├── wayfay.py
+│       ├── website_cloner.py
+│       └── wg_activate.py
 ├── data/                    # Application data
 │   ├── backup-tool/         # Database backups & credentials
+│   │   ├── credentials.json
+│   │   ├── token.pickle
+│   │   └── db/              # Database backup files
+│   │       ├── db_backup_20250510_093801.dump
+│   │       ├── db_backup_20250518_070156.dump
+│   │       └── db_backup_20250704_165920.dump
 │   └── wifi_passwords.json  # Stored Wi-Fi passwords
 ├── logs/                    # Application logs
+│   ├── backup_tool.log
+│   ├── chromedriver_installer.log
+│   ├── docs_generator.log
+│   ├── file_organizer.log
+│   ├── gist_uploader.log
+│   ├── project_generator.log
+│   ├── subtitle_manager.log
+│   ├── video_downloader.log
+│   └── wireguard_activator_.log
 ├── pyproject.toml          # Project configuration
-├── requirements.txt        # Python dependencies
-└── uv.lock                # UV lock file
+├── README.md               # Project documentation
+└── uv.lock                 # UV lock file
 ```
+
+---
 
 ## 🔧 Development
 
@@ -207,6 +236,10 @@ To contribute or modify the tool:
 1. **Fork and clone the repository**
 2. **Set up the development environment:**
    ```sh
+   uv sync
+
+   # or
+
    uv venv
    source .venv/bin/activate
    uv pip install -e .
@@ -214,6 +247,8 @@ To contribute or modify the tool:
 3. **Make your changes** in the `automations_cli/` directory
 4. **Test your changes** by running the CLI commands
 5. **Submit a pull request**
+
+---
 
 ## 🤝 Contributing
 

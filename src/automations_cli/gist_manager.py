@@ -333,6 +333,36 @@ def delete_gist(token: str, gist_identifier: str) -> bool:
         sys.exit(1)
 
 
+def download_gist(token: str, gist_id_or_url: str, output_dir: str = None):
+    """Download a gist by ID or URL and save its files locally."""
+    # Extract gist ID from URL if needed
+    match = re.search(r"([0-9a-f]{32})", gist_id_or_url)
+    if not match:
+        print(f"❌ Invalid gist ID or URL: {gist_id_or_url}", file=sys.stderr)
+        sys.exit(1)
+    gist_id = match.group(1)
+
+    gist = find_gist_by_id(token, gist_id)
+    if not gist:
+        print(f"❌ Gist not found: {gist_id}", file=sys.stderr)
+        sys.exit(1)
+
+    # Determine output directory
+    if output_dir is None:
+        output_dir = f"gist-{gist_id}"
+    out_path = Path(output_dir)
+    out_path.mkdir(parents=True, exist_ok=True)
+
+    # Download each file
+    for filename, fileinfo in gist["files"].items():
+        raw_url = fileinfo["raw_url"]
+        file_content = requests.get(raw_url).text
+        (out_path / filename).write_text(file_content, encoding="utf-8")
+        print(f"Downloaded: {filename}")
+
+    print(f"✅ Gist {gist_id} downloaded to {out_path.resolve()}")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Manage GitHub Gists.")
     subparsers = parser.add_subparsers(dest="action", required=True)
@@ -387,6 +417,20 @@ if __name__ == "__main__":
         help="Gist ID or filename to identify the gist to delete.",
     )
 
+    # Download subcommand
+    download_parser = subparsers.add_parser(
+        "download", help="Download a gist by ID or URL."
+    )
+    download_parser.add_argument(
+        "gist_id_or_url",
+        help="Gist ID or full gist URL to download."
+    )
+    download_parser.add_argument(
+        "--output-dir",
+        default=None,
+        help="Directory to save the gist files (default: ./gist-<id>)."
+    )
+
     args = parser.parse_args()
 
     # Load environment variables
@@ -419,3 +463,5 @@ if __name__ == "__main__":
         list_gists(token)
     elif args.action == "delete":
         delete_gist(token, args.gist_identifier)
+    elif args.action == "download":
+        download_gist(token, args.gist_id_or_url, args.output_dir)

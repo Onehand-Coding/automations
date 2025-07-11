@@ -5,26 +5,30 @@ import venv
 import argparse
 import subprocess
 from pathlib import Path
+from datetime import datetime
 
-from helper import setup_logging
+from helper import setup_logging, confirm
+from helper.templates import (
+    LICENSE_TEMPLATES,
+    README_TEMPLATE,
+    PYPROJECT_TEMPLATE,
+    GITIGNORE_TEMPLATE,
+)
 
-
-def confirm(prompt):
-    """Get user confirmation."""
-    while True:
-        reply = input(f"{prompt} [y/N]: ").lower().strip()
-        if reply in ["y", "yes"]:
-            return True
-        if reply in ["n", "no", ""]:
-            return False
-
+# def confirm(prompt):
+#     """Get user confirmation."""
+#     while True:
+#         reply = input(f"{prompt} [y/N]: ").lower().strip()
+#         if reply in ["y", "yes"]:
+#             return True
+#         if reply in ["n", "no", ""]:
+#             return False
 
 DEFAULT_PROJECTS_DIR = os.path.join(
     os.getenv("DEFAULT_PROJECTS_DIR", os.path.expanduser("~/Coding")), "projects"
 )
 
 logger = setup_logging(log_file="project_generator.log")
-
 
 def check_uv_installed():
     """Check if uv is installed on the system."""
@@ -40,6 +44,27 @@ def check_uv_installed():
         return False
 
 
+def prompt_if_missing(value, prompt, default=None, choices=None):
+    if value:
+        return value
+    prompt_str = prompt
+    if choices:
+        prompt_str += f" ({'/'.join(choices)})"
+    if default:
+        prompt_str += f" [{default}]"
+    prompt_str += ": "
+    while True:
+        answer = input(prompt_str).strip()
+        if not answer and default is not None:
+            return default
+        if choices and answer and answer not in choices:
+            print(f"Please choose from: {', '.join(choices)}")
+            continue
+        if answer:
+            return answer
+        if default is not None:
+            return default
+
 def open_in_sublime(project_path):
     """Open the project in Sublime Text."""
     try:
@@ -54,94 +79,18 @@ def open_in_sublime(project_path):
     except FileNotFoundError:
         logger.error("Sublime Text is not installed or not in PATH")
 
+def validate_args(args):
+    """Validate command-line arguments for the new flag set."""
+    if args.type not in ("app", "cli", "lib"):
+        logger.error("Invalid project type specified.")
+        print("❌ Error: --type must be one of: app, cli, lib.", file=sys.stderr)
+        sys.exit(1)
+    # No other complex validation needed with the new flag set
 
-def create_minimal_pyproject_toml(
-    project_name,
-    package_name,
-    use_src_layout=False,
-    is_app=False,
-    is_bin=False,
-    has_readme=False,
-):
-    """Create a minimal pyproject.toml file."""
-    readme_line = 'readme = "README.md"\n' if has_readme else ""
-
-    if is_app:
-        pyproject_content = f'''[project]
-name = "{project_name}"
-version = "0.1.0"
-description = "Add your description here"
-{readme_line}requires-python = ">=3.8"
-dependencies = []
-'''
-    else:
-        build_backend = "hatchling.build"
-        packages_config = ""
-        if use_src_layout:
-            packages_config = (
-                f'\n[tool.hatch.build.targets.wheel]\npackages = ["src/{package_name}"]'
-            )
-
-        entry_point = ""
-        if is_bin:
-            main_path = f"{package_name}.main:main"
-            if use_src_layout:
-                main_path = f"src.{package_name}.main:main"
-
-            entry_point = (
-                f'''\n[project.scripts]\n{project_name} = "{package_name}.main:main"'''
-            )
-
-        pyproject_content = f'''[build-system]
-requires = ["hatchling"]
-build-backend = "{build_backend}"
-
-[project]
-name = "{project_name}"
-version = "0.1.0"
-description = "Add your description here"
-{readme_line}requires-python = ">=3.8"
-dependencies = []{entry_point}{packages_config}
-'''
-
-    with open("pyproject.toml", "w") as f:
-        f.write(pyproject_content)
-
-
-def create_license_file(license_type):
-    """Create a LICENSE file (MIT example)."""
-    if license_type.upper() == "MIT":
-        license_content = """MIT License
-
-Copyright (c) 2025 Your Name
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-"""
-        with open("LICENSE", "w") as f:
-            f.write(license_content)
-        logger.info("Created MIT LICENSE file.")
-
-
-def create_project_files(project_name, package_name, args):
-    """Create the project directory structure and files based on arguments."""
+def create_project_files(project_name, package_name, is_app, is_cli, use_src_layout):
+    """Create the project directory structure and files based on project type."""
     # Determine the main source directory
-    base_dir = Path("src") / package_name if args.src else Path(package_name)
+    base_dir = Path("src") / package_name if use_src_layout else Path(package_name)
 
     # Create main package directory
     base_dir.mkdir(parents=True, exist_ok=True)
@@ -152,7 +101,7 @@ def create_project_files(project_name, package_name, args):
     )
 
     # Create main module for library or binary
-    if not args.app:
+    if not is_app:
         main_content = f'''"""Main module for {project_name}."""
 
 def main():
@@ -165,7 +114,7 @@ if __name__ == "__main__":
         (base_dir / "main.py").write_text(main_content)
 
     # Create app.py for app structure
-    if args.app:
+    if is_app:
         Path("app.py").write_text(f'''"""Main application for {project_name}."""
 
 def main():
@@ -176,71 +125,92 @@ if __name__ == "__main__":
     main()
 ''')
 
+def create_minimal_pyproject_toml(
+    project_name,
+    package_name,
+    use_src_layout,
+    is_app,
+    is_cli,
+    has_readme,
+    author,
+    email,
+    description,
+    license_type,
+):
+    """Create a pyproject.toml file using the template."""
+    readme_line = 'readme = "README.md"\n' if has_readme else ""
 
-def create_readme(project_name, package_name, args):
-    """Create README.md file."""
-    usage_section = ""
-    if args.app:
-        usage_section = "## Usage\n\n```bash\npython app.py\n```"
-    elif args.bin:
-        usage_section = (
-            f"## Usage\n\n```bash\n# After installation\n{project_name}\n```"
-        )
+    if is_app:
+        pyproject_content = f'''[project]
+name = "{project_name}"
+version = "0.1.0"
+description = "{description}"
+{readme_line}requires-python = ">=3.9"
+dependencies = []
+'''
     else:
-        usage_section = f"## Usage\n\n```python\nimport {package_name}\n\n{package_name}.main.main()\n```"
+        pyproject_content = PYPROJECT_TEMPLATE.format(
+            project_name=project_name,
+            package_name=package_name,
+            license=license_type,
+            author=author,
+            email=email,
+            description=description,
+        )
+        if is_cli:
+            main_path = f"{package_name}.main:main"
+            if use_src_layout:
+                main_path = f"src.{package_name}.main:main"
+            pyproject_content = pyproject_content.replace(
+                f'[project.scripts]\nrun-project = "{package_name}.main:main"',
+                f'[project.scripts]\n{project_name} = "{main_path}"'
+            )
+        if use_src_layout and "[tool.hatch.build.targets.wheel]" in pyproject_content:
+            pyproject_content = pyproject_content.replace(
+                f'packages = ["src/{package_name}"]',
+                f'packages = ["src/{package_name}"]'
+            )
+        elif use_src_layout:
+            pyproject_content += f'\n[tool.hatch.build.targets.wheel]\npackages = ["src/{package_name}"]'
 
-    installation_section = "## Installation\n\n```bash\npip install -e .\n```"
-    readme_content = f"# {project_name}\n\nAdd your description here\n\n{installation_section}\n\n{usage_section}\n"
-    Path("README.md").write_text(readme_content)
+    with open("pyproject.toml", "w") as f:
+        f.write(pyproject_content)
+    logger.info("Created pyproject.toml.")
+
+def create_license_file(license_type, author):
+    """Create a LICENSE file using the template."""
+    year = datetime.now().year
+    content = LICENSE_TEMPLATES.get(license_type.upper(), LICENSE_TEMPLATES["MIT"]).format(
+        year=year, author=author
+    )
+    with open("LICENSE", "w") as f:
+        f.write(content)
+    logger.info(f"Created {license_type} LICENSE file.")
+
+def create_readme(project_name, package_name, description, license_type):
+    """Create README.md file using the template."""
+    usage_section = ""
+    # Use the new type flags to determine usage section
+    if Path("app.py").exists():
+        usage_section = "## Usage\n\n```bash\npython app.py\n```"
+    elif Path("src").exists() or Path(package_name).exists():
+        usage_section = f"## Usage\n\n```python\nimport {package_name}\n\n{package_name}.main.main()\n```"
+    else:
+        usage_section = f"## Usage\n\n```bash\n# After installation\n{project_name}\n```"
+
+    content = README_TEMPLATE.format(
+        project_name=project_name,
+        description=description,
+        license=license_type,
+    ).replace("## Usage\n\n```bash\n{project_name} --help\n```", usage_section)
+
+    Path("README.md").write_text(content)
     logger.info("Created README.md.")
 
-
 def create_gitignore():
-    """Create a comprehensive .gitignore file."""
-    Path(".gitignore").write_text("""# Python
-__pycache__/
-.rufff_cache
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# Virtual environments
-.venv/
-venv/
-ENV/
-env/
-
-# IDEs
-.vscode/
-*.sublime-*
-.idea/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs
-logs/
-*.log
-""")
+    """Create a .gitignore file using the template."""
+    Path(".gitignore").write_text(GITIGNORE_TEMPLATE)
     logger.info("Created .gitignore.")
-
 
 def create_sublime_project(project_name):
     """Create Sublime Text project files with settings."""
@@ -288,13 +258,13 @@ def create_sublime_project(project_name):
     project_file.write_text(project_content)
     logger.info("Created Sublime Text project files.")
 
-
-def setup_dependencies(use_uv, create_venv):
+def setup_dependencies(create_venv):
     """Set up dependencies and virtual environment using uv or pip."""
     if not create_venv:
         logger.info("Skipping virtual environment creation.")
         return
 
+    use_uv = check_uv_installed()
     if use_uv:
         logger.info("Setting up project with uv...")
         try:
@@ -307,11 +277,9 @@ def setup_dependencies(use_uv, create_venv):
         logger.info("Setting up project with pip and venv...")
         create_virtual_env_pip()
 
-
 def create_virtual_env_pip():
     """Create a virtual environment and install package using pip."""
     logger.info("Creating virtual environment with venv...")
-    # Use EnvBuilder with symlinks=False to be more robust
     builder = venv.EnvBuilder(with_pip=True, symlinks=False)
     builder.create(".venv")
     logger.info("Virtual environment created at .venv/")
@@ -322,7 +290,6 @@ def create_virtual_env_pip():
         logger.info("Package installed in development mode using pip.")
     except subprocess.CalledProcessError as e:
         logger.error(f"Failed to install package with pip: {e}")
-
 
 def init_git_repo(skip_git):
     """Initialize a Git repository."""
@@ -338,24 +305,23 @@ def init_git_repo(skip_git):
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         logger.error(f"Failed to initialize Git repository: {e}")
 
-
 def main():
     """Main function to run the project generator."""
     parser = argparse.ArgumentParser(
-        description="Generate a new Python project with uv support and flexible templates.",
+        description="Generate a new Python project with flexible templates.",
         formatter_class=argparse.RawTextHelpFormatter,
         epilog="""
-Project Templates:
-  --app                            Simple script-like app (app.py)
-  --src --bin                      CLI tool with a src layout
-  --src                            Standard library/SDK with a src layout
-  --no-venv                        Quick prototype without a virtual env
+Project Types:
+  --type app        Simple script-like app (app.py)
+  --type cli        CLI tool with entry point
+  --type lib        Standard library/SDK (default)
 
 Examples:
-  %(prog)s my-app --app
-  %(prog)s my-cli --src --bin --license MIT
-  %(prog)s my-lib --src --readme
-  %(prog)s quick-test --app --no-venv --no-git
+  %(prog)s my-app --type app
+  %(prog)s my-cli --type cli --author "Jane Doe"
+  %(prog)s my-lib --type lib --description "My library"
+  %(prog)s quick-test --type app --no-venv --no-git --no-docs
+  %(prog)s --interactive
 """,
     )
     # Basic options
@@ -366,33 +332,44 @@ Examples:
         type=str,
         help=f"Path to create project (default: {DEFAULT_PROJECTS_DIR})",
     )
-    # Project structure
+    # Project type
     parser.add_argument(
-        "--src", action="store_true", help="Use src/ layout for packaging"
+        "--type",
+        choices=["app", "cli", "lib"],
+        default=None,
+        help="Project type: app, cli, or lib (default: lib)",
     )
+    # Docs
     parser.add_argument(
-        "--app",
+        "--no-docs",
         action="store_true",
-        help="Create a simple application structure (app.py)",
+        help="Do not generate documentation files (README.md, LICENSE, pyproject.toml, .gitignore). Project will not be buildable with uv/hatchling until you add the required files.",
+    )
+    # Metadata
+    parser.add_argument(
+        "--description",
+        default=None,
+        help="Project description for README and pyproject.toml (default: Add your description here)",
     )
     parser.add_argument(
-        "--bin",
-        action="store_true",
-        help="Configure project as a CLI tool with an entry point",
+        "--author",
+        default=None,
+        help="Author name for LICENSE and pyproject.toml (default: Your Name)",
     )
-    # File generation
     parser.add_argument(
-        "--readme", action="store_true", help="Generate a README.md file"
+        "--email",
+        default=None,
+        help="Author email for pyproject.toml (default: your.email@example.com)",
     )
-    parser.add_argument("--license", type=str, help="Add a license file (e.g., MIT)")
+    parser.add_argument(
+        "--license-type",
+        choices=["MIT", "Apache-2.0", "GPL-3.0"],
+        default=None,
+        help="License type for documentation files (default: MIT)",
+    )
     # Environment
     parser.add_argument(
         "--no-venv", action="store_true", help="Skip virtual environment creation"
-    )
-    parser.add_argument(
-        "--no-uv",
-        action="store_true",
-        help="Force use of pip/venv even if uv is installed",
     )
     # Git
     parser.add_argument(
@@ -402,12 +379,33 @@ Examples:
     parser.add_argument(
         "--open", "-o", action="store_true", help="Open in Sublime Text after creation"
     )
+    # Interactive
     parser.add_argument(
-        "--no-open", action="store_true", help="Skip opening in Sublime Text"
+        "--interactive",
+        action="store_true",
+        help="Prompt interactively for all project options.",
     )
     args = parser.parse_args()
 
-    project_name = args.name or input("Enter project name: ").strip()
+    # Interactive prompts
+    if args.interactive:
+        args.name = prompt_if_missing(args.name, "Project name")
+        args.type = prompt_if_missing(args.type, "Project type", default="lib", choices=["app", "cli", "lib"])
+        args.description = prompt_if_missing(args.description, "Project description", default="Add your description here")
+        args.author = prompt_if_missing(args.author, "Author name", default="Your Name")
+        args.email = prompt_if_missing(args.email, "Author email", default="your.email@example.com")
+        args.license_type = prompt_if_missing(args.license_type, "License type", default="MIT", choices=["MIT", "Apache-2.0", "GPL-3.0"])
+        args.no_docs = prompt_if_missing(args.no_docs, "Skip documentation generation? (y/N)", default="n", choices=["y", "n"]) == "y"
+        args.no_venv = prompt_if_missing(args.no_venv, "Skip virtual environment creation? (y/N)", default="n", choices=["y", "n"]) == "y"
+        args.no_git = prompt_if_missing(args.no_git, "Skip Git repository initialization? (y/N)", default="n", choices=["y", "n"]) == "y"
+        args.open = prompt_if_missing(args.open, "Open in Sublime Text after creation? (y/N)", default="n", choices=["y", "n"]) == "y"
+        if not args.path:
+            args.path = prompt_if_missing(None, "Project path", default=DEFAULT_PROJECTS_DIR)
+
+    # Validate arguments
+    validate_args(args)
+
+    project_name = args.name
     if not project_name:
         logger.error("Project name cannot be empty.")
         sys.exit(1)
@@ -430,28 +428,38 @@ Examples:
 
     package_name = project_name.replace("-", "_")
     create_venv = not args.no_venv
-    use_uv = not args.no_uv and check_uv_installed()
-    will_create_readme = args.readme or args.bin or (args.src and not args.app)
 
-    # Create all project files
-    create_project_files(project_name, package_name, args)
-    create_minimal_pyproject_toml(
-        project_name, package_name, args.src, args.app, args.bin, will_create_readme
-    )
+    # Determine project type
+    is_app = args.type == "app"
+    is_cli = args.type == "cli"
+    use_src_layout = args.type in ("cli", "lib")
+
+    # Always create the basic project structure
+    create_project_files(project_name, package_name, is_app, is_cli, use_src_layout)
     create_gitignore()
-    create_sublime_project(project_name)  # Sublime integration
-    if will_create_readme:
-        create_readme(project_name, package_name, args)
-    if args.license:
-        create_license_file(args.license)
+    create_sublime_project(project_name)
 
-    # Set up environment and dependencies
-    if create_venv:
-        if use_uv:
-            logger.info("uv detected - using it for dependency management.")
-        else:
-            logger.info("uv not found or disabled - using pip/venv.")
-    setup_dependencies(use_uv, create_venv)
+    if args.no_docs:
+        logger.warning("Skipping documentation generation. Project will not be buildable with uv/hatchling until you add the required files.")
+        # Do NOT create pyproject.toml, README.md, LICENSE, or run setup_dependencies
+    else:
+        # Create all docs and pyproject.toml
+        create_readme(project_name, package_name, args.description, args.license_type)
+        create_license_file(args.license_type, args.author)
+        create_minimal_pyproject_toml(
+            project_name,
+            package_name,
+            use_src_layout,
+            is_app,
+            is_cli,
+            True,  # always has_readme
+            args.author,
+            args.email,
+            args.description,
+            args.license_type,
+        )
+        # Set up environment and dependencies
+        setup_dependencies(create_venv)
 
     # Initialize Git repository
     init_git_repo(args.no_git)
@@ -463,27 +471,25 @@ Examples:
     # Print next steps
     logger.info("\nNext steps:")
     logger.info(f"1. cd {full_project_path}")
-    if create_venv:
+    if not args.no_docs and create_venv:
         logger.info(
             "2. source .venv/bin/activate  # On Windows: .venv\\Scripts\\activate"
         )
-        if args.app:
+        if is_app:
             logger.info("3. python app.py")
-        elif args.bin:
+        elif is_cli:
             logger.info(f"3. {project_name}")
         else:
             logger.info("3. Start coding!")
     else:
-        if args.app:
+        if is_app:
             logger.info("2. python app.py")
         else:
             logger.info("2. Start coding!")
 
     # Handle Sublime Text opening
-    if not args.no_open:
-        if args.open or confirm("\nOpen project in Sublime Text?"):
-            open_in_sublime(str(full_project_path))
-
+    if args.open:
+        open_in_sublime(str(full_project_path))
 
 if __name__ == "__main__":
     main()

@@ -60,9 +60,65 @@ def generate_project(
     project_name: str = typer.Argument(
         ..., help="The name for the new project directory."
     ),
+    path: Optional[str] = typer.Option(
+        None, "--path", "-p", help="Path to create project (default: ~/Coding/projects)"
+    ),
+    type: str = typer.Option(
+        "lib", "--type", help="Project type: app, cli, or lib (default: lib)"
+    ),
+    no_docs: bool = typer.Option(
+        False, "--no-docs", help="Do not generate documentation files (README.md, LICENSE, pyproject.toml, .gitignore). Project will not be buildable with uv/hatchling until you add the required files."
+    ),
+    description: str = typer.Option(
+        "Add your description here", "--description", help="Project description for README and pyproject.toml"
+    ),
+    author: str = typer.Option(
+        "Your Name", "--author", help="Author name for LICENSE and pyproject.toml"
+    ),
+    email: str = typer.Option(
+        "your.email@example.com", "--email", help="Author email for pyproject.toml"
+    ),
+    license_type: str = typer.Option(
+        "MIT", "--license-type", help="License type for documentation files (MIT, Apache-2.0, GPL-3.0)"
+    ),
+    no_venv: bool = typer.Option(
+        False, "--no-venv", help="Skip virtual environment creation"
+    ),
+    no_git: bool = typer.Option(
+        False, "--no-git", help="Skip Git repository initialization"
+    ),
+    open: bool = typer.Option(
+        False, "--open", "-o", help="Open in Sublime Text after creation"
+    ),
+    interactive: bool = typer.Option(
+        False, "--interactive", help="Prompt interactively for all project options."
+    ),
 ):
-    """Generates a new project directory structure."""
-    _run_script("project_generator.py", [project_name])
+    args = [project_name]
+    if path:
+        args.extend(["--path", path])
+    if type:
+        args.extend(["--type", type])
+    if no_docs:
+        args.append("--no-docs")
+    if description:
+        args.extend(["--description", description])
+    if author:
+        args.extend(["--author", author])
+    if email:
+        args.extend(["--email", email])
+    if license_type:
+        args.extend(["--license-type", license_type])
+    if no_venv:
+        args.append("--no-venv")
+    if no_git:
+        args.append("--no-git")
+    if open:
+        args.append("--open")
+    if interactive:
+        args.append("--interactive")
+
+    _run_script("project_generator.py", args)
 
 
 @app.command()
@@ -339,7 +395,7 @@ def subtitle_embed(
 @gist_app.command("list")
 def gist_list():
     """Lists existing GitHub Gists."""
-    _run_script("gist_uploader.py", ["list"])
+    _run_script("gist_manager.py", ["list"])
 
 
 @app.command()
@@ -438,7 +494,7 @@ def gist_upload(
         args.append("--public")
     if non_interactive:
         args.append("--non-interactive")
-    _run_script("gist_uploader.py", args)
+    _run_script("gist_manager.py", args)
 
 
 @gist_app.command("update")
@@ -512,7 +568,7 @@ def gist_update(
     args.extend(["--update", gist_identifier])
     if description:
         args.extend(["--description", description])
-    _run_script("gist_uploader.py", args)
+    _run_script("gist_manager.py", args)
 
 
 @gist_app.command("delete")
@@ -523,7 +579,25 @@ def gist_delete(
 ):
     """Deletes a GitHub Gist by filename or ID."""
     args = ["delete", gist_identifier]
-    _run_script("gist_uploader.py", args)
+    _run_script("gist_manager.py", args)
+
+
+@gist_app.command("download")
+def gist_download(
+    gist_id_or_url: str = typer.Argument(
+        ..., help="Gist ID or full gist URL to download."
+    ),
+    output_dir: Optional[str] = typer.Option(
+        None, "--output-dir", help="Directory to save the gist files (default: ./gist-<id>)."
+    ),
+):
+    """
+    Download a GitHub Gist by ID or URL and save its files locally.
+    """
+    args = ["download", gist_id_or_url]
+    if output_dir:
+        args.extend(["--output-dir", output_dir])
+    _run_script("gist_manager.py", args)
 
 
 if __name__ == "__main__":
