@@ -60,8 +60,6 @@ packages = ["src/{package_name}"]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0",
-    "ruff>=0.3.0",
     "pytest>=8.4",
     "pytest-mock>=3.14",
     "pytest-asyncio>=0.24",
