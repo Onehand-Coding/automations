@@ -19,8 +19,12 @@ subtitle_app = typer.Typer(
     name="subtitle", help="Tools for shifting and embedding subtitles."
 )
 
+# Dedicated Typer app for gist commands
+gist_app = typer.Typer(name="gist", help="Tools for managing GitHub gists.")
+
 # Add dedicated apps to main app
 app.add_typer(subtitle_app)
+app.add_typer(gist_app)
 
 
 # --- Helper Function to Run Scripts ---
@@ -332,6 +336,12 @@ def subtitle_embed(
     _run_script("subtitle_manager.py", args)
 
 
+@gist_app.command("list")
+def gist_list():
+    """Lists existing GitHub Gists."""
+    _run_script("gist_uploader.py", ["list"])
+
+
 @app.command()
 def generate_docs(
     dir: str = typer.Option(
@@ -403,6 +413,117 @@ def generate_docs(
     if package_name:
         args.extend(["--package-name", package_name])
     _run_script("docs_generator.py", args)
+
+
+@gist_app.command("upload")
+def gist_upload(
+    file_paths: List[str] = typer.Argument(
+        ..., help="Paths to the files to upload as a gist."
+    ),
+    description: str = typer.Option(
+        "", "--description", "-d", help="Description for the gist."
+    ),
+    public: bool = typer.Option(
+        False, "--public", help="Create a public gist (default: secret)."
+    ),
+    non_interactive: bool = typer.Option(
+        False, "--non-interactive", help="Skip prompting and create new gist."
+    ),
+):
+    """Uploads files as a new GitHub Gist."""
+    args = ["upload"] + list(file_paths)
+    if description:
+        args.extend(["--description", description])
+    if public:
+        args.append("--public")
+    if non_interactive:
+        args.append("--non-interactive")
+    _run_script("gist_uploader.py", args)
+
+
+@gist_app.command("update")
+def gist_update(
+    gist_identifier: str = typer.Argument(
+        ..., help="Gist ID or filename to identify the gist to update."
+    ),
+    file_paths: Optional[List[str]] = typer.Argument(
+        None,
+        help="Paths to the files to update (optional for description-only updates).",
+    ),
+    description: Optional[str] = typer.Option(
+        None,
+        "--description",
+        "-d",
+        help="New description for the gist (uses existing if not provided).",
+    ),
+    description_only: bool = typer.Option(
+        False,
+        "--description-only",
+        help="Update only the description, keeping all existing files. Use with --description.",
+    ),
+):
+    """Updates an existing GitHub Gist by filename or ID."""
+    # Safety check: if no files provided and no description, show error
+    if not file_paths and not description:
+        typer.echo(
+            "❌ Error: You must provide either files to update or a new description",
+            err=True,
+        )
+        typer.echo("Examples:", err=True)
+        typer.echo("  automations gist update abc123 file1.py file2.py", err=True)
+        typer.echo(
+            "  automations gist update abc123 --description 'New description' --description-only",
+            err=True,
+        )
+        typer.echo(
+            "  automations gist update abc123 file1.py --description 'New description'",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    # Safety check: if description_only is used, ensure no files are provided
+    if description_only and file_paths:
+        typer.echo("❌ Error: Cannot use --description-only with file paths", err=True)
+        raise typer.Exit(1)
+
+    # Safety check: if description_only is used, ensure description is provided
+    if description_only and not description:
+        typer.echo("❌ Error: --description-only requires --description", err=True)
+        raise typer.Exit(1)
+
+    # Safety check: if only description is provided without --description-only flag
+    if description and not file_paths and not description_only:
+        typer.echo(
+            "❌ Error: To update only the description, use --description-only to avoid accidentally deleting files",
+            err=True,
+        )
+        typer.echo(
+            "Use: automations gist update {} --description '{}' --description-only".format(
+                gist_identifier, description
+            ),
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    args = ["update"]
+    # Add file paths if provided (this will be empty for description-only updates)
+    if file_paths:
+        args.extend(list(file_paths))
+    args.extend(["--update", gist_identifier])
+    if description:
+        args.extend(["--description", description])
+    _run_script("gist_uploader.py", args)
+
+
+@gist_app.command("delete")
+def gist_delete(
+    gist_identifier: str = typer.Argument(
+        ..., help="Gist ID or filename to identify the gist to delete."
+    ),
+):
+    """Deletes a GitHub Gist by filename or ID."""
+    args = ["delete", gist_identifier]
+    _run_script("gist_uploader.py", args)
 
 
 if __name__ == "__main__":

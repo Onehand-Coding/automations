@@ -25,6 +25,8 @@ dependencies = [
     { name = "google-auth" },
     { name = "google-auth-oauthlib" },
     { name = "pysrt" },
+    { name = "python-dotenv" },
+    { name = "requests" },
     { name = "send2trash" },
     { name = "tqdm" },
     { name = "typer" },
@@ -38,6 +40,8 @@ requires-dist = [
     { name = "google-auth" },
     { name = "google-auth-oauthlib" },
     { name = "pysrt" },
+    { name = "python-dotenv" },
+    { name = "requests" },
     { name = "send2trash" },
     { name = "tqdm" },
     { name = "typer", specifier = "==0.9.0" },
@@ -659,6 +663,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/31/4a/becf78d9d3df56e6c4a9c50b83794e5436b6c5ab6dd8a3f934e94c89338c/pysubs2-1.8.0.tar.gz", hash = "sha256:3397bb58a4a15b1325ba2ae3fd4d7c214e2c0ddb9f33190d6280d783bb433b20", size = 1130048, upload-time = "2024-12-24T12:39:47.769Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/99/09/0fc0719162e5ad723f71d41cf336f18b6b5054d70dc0fe42ace6b4d2bdc9/pysubs2-1.8.0-py3-none-any.whl", hash = "sha256:05716f5039a9ebe32cd4d7673f923cf36204f3a3e99987f823ab83610b7035a0", size = 43516, upload-time = "2024-12-24T12:39:44.469Z" },
+]
+
+[[package]]
+name = "python-dotenv"
+version = "1.1.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f6/b0/4bc07ccd3572a2f9df7e6782f52b0c6c90dcbb803ac4a167702d7d0dfe1e/python_dotenv-1.1.1.tar.gz", hash = "sha256:a8a6399716257f45be6a007360200409fce5cda2661e3dec71d23dc15f6189ab", size = 41978, upload-time = "2025-06-24T04:21:07.341Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/5f/ed/539768cf28c661b5b068d66d96a2f155c4971a5d55684a514c1a0e0dec2f/python_dotenv-1.1.1-py3-none-any.whl", hash = "sha256:31f23644fe2602f88ff55e1f5c79ba497e01224ee7737937930c448e4d0e24dc", size = 20556, upload-time = "2025-06-24T04:21:06.073Z" },
 ]
 
 [[package]]
