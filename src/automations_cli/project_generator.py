@@ -30,6 +30,7 @@ DEFAULT_PROJECTS_DIR = os.path.join(
 
 logger = setup_logging(log_file="project_generator.log")
 
+
 def check_uv_installed():
     """Check if uv is installed on the system."""
     try:
@@ -65,6 +66,7 @@ def prompt_if_missing(value, prompt, default=None, choices=None):
         if default is not None:
             return default
 
+
 def open_in_sublime(project_path):
     """Open the project in Sublime Text."""
     try:
@@ -79,6 +81,7 @@ def open_in_sublime(project_path):
     except FileNotFoundError:
         logger.error("Sublime Text is not installed or not in PATH")
 
+
 def validate_args(args):
     """Validate command-line arguments for the new flag set."""
     if args.type not in ("app", "cli", "lib"):
@@ -86,6 +89,7 @@ def validate_args(args):
         print("❌ Error: --type must be one of: app, cli, lib.", file=sys.stderr)
         sys.exit(1)
     # No other complex validation needed with the new flag set
+
 
 def create_project_files(project_name, package_name, is_app, is_cli, use_src_layout):
     """Create the project directory structure and files based on project type."""
@@ -125,6 +129,7 @@ if __name__ == "__main__":
     main()
 ''')
 
+
 def create_minimal_pyproject_toml(
     project_name,
     package_name,
@@ -163,29 +168,33 @@ dependencies = []
                 main_path = f"src.{package_name}.main:main"
             pyproject_content = pyproject_content.replace(
                 f'[project.scripts]\nrun-project = "{package_name}.main:main"',
-                f'[project.scripts]\n{project_name} = "{main_path}"'
+                f'[project.scripts]\n{project_name} = "{main_path}"',
             )
         if use_src_layout and "[tool.hatch.build.targets.wheel]" in pyproject_content:
             pyproject_content = pyproject_content.replace(
                 f'packages = ["src/{package_name}"]',
-                f'packages = ["src/{package_name}"]'
+                f'packages = ["src/{package_name}"]',
             )
         elif use_src_layout:
-            pyproject_content += f'\n[tool.hatch.build.targets.wheel]\npackages = ["src/{package_name}"]'
+            pyproject_content += (
+                f'\n[tool.hatch.build.targets.wheel]\npackages = ["src/{package_name}"]'
+            )
 
     with open("pyproject.toml", "w") as f:
         f.write(pyproject_content)
     logger.info("Created pyproject.toml.")
 
+
 def create_license_file(license_type, author):
     """Create a LICENSE file using the template."""
     year = datetime.now().year
-    content = LICENSE_TEMPLATES.get(license_type.upper(), LICENSE_TEMPLATES["MIT"]).format(
-        year=year, author=author
-    )
+    content = LICENSE_TEMPLATES.get(
+        license_type.upper(), LICENSE_TEMPLATES["MIT"]
+    ).format(year=year, author=author)
     with open("LICENSE", "w") as f:
         f.write(content)
     logger.info(f"Created {license_type} LICENSE file.")
+
 
 def create_readme(project_name, package_name, description, license_type):
     """Create README.md file using the template."""
@@ -196,7 +205,9 @@ def create_readme(project_name, package_name, description, license_type):
     elif Path("src").exists() or Path(package_name).exists():
         usage_section = f"## Usage\n\n```python\nimport {package_name}\n\n{package_name}.main.main()\n```"
     else:
-        usage_section = f"## Usage\n\n```bash\n# After installation\n{project_name}\n```"
+        usage_section = (
+            f"## Usage\n\n```bash\n# After installation\n{project_name}\n```"
+        )
 
     content = README_TEMPLATE.format(
         project_name=project_name,
@@ -207,10 +218,12 @@ def create_readme(project_name, package_name, description, license_type):
     Path("README.md").write_text(content)
     logger.info("Created README.md.")
 
+
 def create_gitignore():
     """Create a .gitignore file using the template."""
     Path(".gitignore").write_text(GITIGNORE_TEMPLATE)
     logger.info("Created .gitignore.")
+
 
 def create_sublime_project(project_name):
     """Create Sublime Text project files with settings."""
@@ -258,6 +271,7 @@ def create_sublime_project(project_name):
     project_file.write_text(project_content)
     logger.info("Created Sublime Text project files.")
 
+
 def setup_dependencies(create_venv):
     """Set up dependencies and virtual environment using uv or pip."""
     if not create_venv:
@@ -277,6 +291,7 @@ def setup_dependencies(create_venv):
         logger.info("Setting up project with pip and venv...")
         create_virtual_env_pip()
 
+
 def create_virtual_env_pip():
     """Create a virtual environment and install package using pip."""
     logger.info("Creating virtual environment with venv...")
@@ -291,6 +306,7 @@ def create_virtual_env_pip():
     except subprocess.CalledProcessError as e:
         logger.error(f"Failed to install package with pip: {e}")
 
+
 def init_git_repo(skip_git):
     """Initialize a Git repository."""
     if skip_git:
@@ -304,6 +320,7 @@ def init_git_repo(skip_git):
         logger.info("Git repository initialized.")
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         logger.error(f"Failed to initialize Git repository: {e}")
+
 
 def main():
     """Main function to run the project generator."""
@@ -390,17 +407,62 @@ Examples:
     # Interactive prompts
     if args.interactive:
         args.name = prompt_if_missing(args.name, "Project name")
-        args.type = prompt_if_missing(args.type, "Project type", default="lib", choices=["app", "cli", "lib"])
-        args.description = prompt_if_missing(args.description, "Project description", default="Add your description here")
+        args.type = prompt_if_missing(
+            args.type, "Project type", default="lib", choices=["app", "cli", "lib"]
+        )
+        args.description = prompt_if_missing(
+            args.description, "Project description", default="Add your description here"
+        )
         args.author = prompt_if_missing(args.author, "Author name", default="Your Name")
-        args.email = prompt_if_missing(args.email, "Author email", default="your.email@example.com")
-        args.license_type = prompt_if_missing(args.license_type, "License type", default="MIT", choices=["MIT", "Apache-2.0", "GPL-3.0"])
-        args.no_docs = prompt_if_missing(args.no_docs, "Skip documentation generation? (y/N)", default="n", choices=["y", "n"]) == "y"
-        args.no_venv = prompt_if_missing(args.no_venv, "Skip virtual environment creation? (y/N)", default="n", choices=["y", "n"]) == "y"
-        args.no_git = prompt_if_missing(args.no_git, "Skip Git repository initialization? (y/N)", default="n", choices=["y", "n"]) == "y"
-        args.open = prompt_if_missing(args.open, "Open in Sublime Text after creation? (y/N)", default="n", choices=["y", "n"]) == "y"
+        args.email = prompt_if_missing(
+            args.email, "Author email", default="your.email@example.com"
+        )
+        args.license_type = prompt_if_missing(
+            args.license_type,
+            "License type",
+            default="MIT",
+            choices=["MIT", "Apache-2.0", "GPL-3.0"],
+        )
+        args.no_docs = (
+            prompt_if_missing(
+                args.no_docs,
+                "Skip documentation generation? (y/N)",
+                default="n",
+                choices=["y", "n"],
+            )
+            == "y"
+        )
+        args.no_venv = (
+            prompt_if_missing(
+                args.no_venv,
+                "Skip virtual environment creation? (y/N)",
+                default="n",
+                choices=["y", "n"],
+            )
+            == "y"
+        )
+        args.no_git = (
+            prompt_if_missing(
+                args.no_git,
+                "Skip Git repository initialization? (y/N)",
+                default="n",
+                choices=["y", "n"],
+            )
+            == "y"
+        )
+        args.open = (
+            prompt_if_missing(
+                args.open,
+                "Open in Sublime Text after creation? (y/N)",
+                default="n",
+                choices=["y", "n"],
+            )
+            == "y"
+        )
         if not args.path:
-            args.path = prompt_if_missing(None, "Project path", default=DEFAULT_PROJECTS_DIR)
+            args.path = prompt_if_missing(
+                None, "Project path", default=DEFAULT_PROJECTS_DIR
+            )
 
     # Validate arguments
     validate_args(args)
@@ -440,7 +502,9 @@ Examples:
     create_sublime_project(project_name)
 
     if args.no_docs:
-        logger.warning("Skipping documentation generation. Project will not be buildable with uv/hatchling until you add the required files.")
+        logger.warning(
+            "Skipping documentation generation. Project will not be buildable with uv/hatchling until you add the required files."
+        )
         # Do NOT create pyproject.toml, README.md, LICENSE, or run setup_dependencies
     else:
         # Create all docs and pyproject.toml
@@ -490,6 +554,7 @@ Examples:
     # Handle Sublime Text opening
     if args.open:
         open_in_sublime(str(full_project_path))
+
 
 if __name__ == "__main__":
     main()

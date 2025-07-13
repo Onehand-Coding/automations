@@ -12,8 +12,40 @@ A powerful, all-in-one command-line tool built with Python to automate everyday 
 * **System Utilities**: Retrieve saved Wi-Fi passwords, manage WireGuard VPN connections, or automatically install the correct `chromedriver` for your browser
 * **Google Photos**: Organize Google Photos Takeout archives
 * **Website Cloning**: Clone websites for offline viewing
-* **Video Downloading**: Download videos or audio from URLs using yt-dlp with advanced options
+* **Modular Downloaders**: Download videos, audio, files, and torrents with robust, standalone scripts and consistent CLI options
 * **Subtitle Management**: Sync, shift, and embed subtitles into video files
+
+## 📥 Downloaders
+
+Automations CLI provides robust, modular downloaders for:
+
+- **Video**: Download videos from URLs or playlists using yt-dlp, with advanced playlist and quality options.
+- **Audio**: Download audio (as mp3) from video URLs or playlists, with the same playlist handling as video.
+- **File**: Download any file (ebooks, images, etc.) using wget or curl, with resume and quiet mode support.
+- **Torrent**: Download torrents or magnet links using aria2c, with pause/resume, speed limits, and config file support.
+
+All downloaders are invoked via the unified `automations download` command and support config files for defaults.
+
+#### **Examples**
+
+```sh
+# Download a video
+automations download video "https://youtube.com/..."
+
+# Download audio from a playlist
+automations download audio "https://youtube.com/..." --playlist-mode all
+
+# Download a file
+automations download file "https://example.com/file.pdf"
+
+# Download a torrent (magnet link)
+automations download torrent "magnet:?xt=urn:btih:..."
+
+# Download a torrent with pause/resume support
+automations download torrent "magnet:?..." --session ~/.aria2.session
+```
+
+See `automations download <type> --help` for all options.
 
 ## 🚀 Installation
 
@@ -30,6 +62,8 @@ This tool is designed to be installed and run from a dedicated Python virtual en
     * `pg_dump` & `pg_restore`
     * `yt-dlp`
     * `ffmpeg` (for subtitle and video operations)
+    * `aria2c` (for torrent downloads)
+    * `wget` and/or `curl` (for file downloads)
 
 **Steps:**
 
@@ -87,6 +121,10 @@ For commands that require credentials or specific paths, create a `.env` file in
   GITHUB_TOKEN=your_github_token
   ```
 
+* **Downloaders**:
+  - Each downloader supports its own config file for default options (e.g., output directory, speed limits, session file for torrents).
+  - See `~/.torrent_downloader_config.ini` and similar for details.
+
 ## 📋 Usage
 
 All functionality is accessed through the main `automations` command.
@@ -101,8 +139,11 @@ automations --help
 | Command              | Description                                                                 |
 |----------------------|-----------------------------------------------------------------------------|
 | `clone-website`      | Clones a website for offline viewing                                        |
-| `download-video`     | Downloads video or audio from a URL using yt-dlp                            |
-|generate-docs         |Generates project documentation files (README.md, LICENSE,..)                |
+| `download video`     | Download videos from URLs or playlists using yt-dlp                         |
+| `download audio`     | Download audio (mp3) from video URLs or playlists                           |
+| `download file`      | Download any file using wget or curl, with resume support                   |
+| `download torrent`   | Download torrents or magnet links using aria2c, with pause/resume support   |
+| `generate-docs`      | Generates project documentation files (README.md, LICENSE,...)              |
 | `generate-project`   | Generates a new project directory structure (with interactive mode)         |
 | `get-wifi-passwords` | Retrieves known Wi-Fi SSIDs and passwords                                   |
 | `install-chromedriver` | Downloads and installs the correct ChromeDriver                           |
@@ -193,13 +234,15 @@ automations/
 │       │   └── templates.py # Template utilities
 │       ├── docs_generator.py
 │       ├── file_organizer.py
+│       ├── file_downloader.py      # Modular file downloader
 │       ├── gist_manager.py
 │       ├── gphotos_takeout_organizer.py
 │       ├── install_chromedriver.py
 │       ├── pg_backup_tool.py
 │       ├── project_generator.py
 │       ├── subtitle_manager.py
-│       ├── video_downloader.py
+│       ├── torrent_downloader.py   # Modular torrent downloader
+│       ├── video_downloader.py     # Modular video/audio downloader
 │       ├── wayfay.py
 │       ├── website_cloner.py
 │       └── wg_activate.py
@@ -217,9 +260,11 @@ automations/
 │   ├── chromedriver_installer.log
 │   ├── docs_generator.log
 │   ├── file_organizer.log
+│   ├── file_downloader.log
 │   ├── gist_uploader.log
 │   ├── project_generator.log
 │   ├── subtitle_manager.log
+│   ├── torrent_downloader.log
 │   ├── video_downloader.log
 │   └── wireguard_activator_.log
 ├── pyproject.toml          # Project configuration

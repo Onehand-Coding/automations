@@ -22,9 +22,25 @@ subtitle_app = typer.Typer(
 # Dedicated Typer app for gist commands
 gist_app = typer.Typer(name="gist", help="Tools for managing GitHub gists.")
 
+# Dedicated Typer app for download commands
+download_app = typer.Typer(
+    name="download", help="Download various types of content (video, audio, files)."
+)
+
 # Add dedicated apps to main app
 app.add_typer(subtitle_app)
 app.add_typer(gist_app)
+app.add_typer(download_app)
+
+TORRENT_CONFIG_FILE = Path.home() / ".torrent_downloader_config.ini"
+TORRENT_DEFAULT_CONFIG = {
+    "output_dir": str(Path.home() / "Downloads" / "Torrents"),
+    "max_connections": "16",
+    "max_download": "",
+    "max_upload": "",
+    "seed": "false",
+    "session_file": str(Path.home() / ".aria2.session"),
+}
 
 
 # --- Helper Function to Run Scripts ---
@@ -54,6 +70,24 @@ def _run_script(script_name: str, args: list[str] = [], use_sudo: bool = False):
     subprocess.call(command)
 
 
+def load_torrent_config() -> dict:
+    """Load torrent configuration from config file."""
+    config = configparser.ConfigParser()
+    if TORRENT_CONFIG_FILE.exists():
+        config.read(TORRENT_CONFIG_FILE)
+        if "settings" in config:
+            return dict(config["settings"])
+    return TORRENT_DEFAULT_CONFIG.copy()
+
+
+def save_torrent_config(config_dict: dict):
+    """Save torrent configuration to config file."""
+    config = configparser.ConfigParser()
+    config["settings"] = config_dict
+    with open(TORRENT_CONFIG_FILE, "w") as f:
+        config.write(f)
+
+
 # --- CLI Commands ---
 @app.command()
 def generate_project(
@@ -67,10 +101,14 @@ def generate_project(
         "lib", "--type", help="Project type: app, cli, or lib (default: lib)"
     ),
     no_docs: bool = typer.Option(
-        False, "--no-docs", help="Do not generate documentation files (README.md, LICENSE, pyproject.toml, .gitignore). Project will not be buildable with uv/hatchling until you add the required files."
+        False,
+        "--no-docs",
+        help="Do not generate documentation files (README.md, LICENSE, pyproject.toml, .gitignore). Project will not be buildable with uv/hatchling until you add the required files.",
     ),
     description: str = typer.Option(
-        "Add your description here", "--description", help="Project description for README and pyproject.toml"
+        "Add your description here",
+        "--description",
+        help="Project description for README and pyproject.toml",
     ),
     author: str = typer.Option(
         "Your Name", "--author", help="Author name for LICENSE and pyproject.toml"
@@ -79,7 +117,9 @@ def generate_project(
         "your.email@example.com", "--email", help="Author email for pyproject.toml"
     ),
     license_type: str = typer.Option(
-        "MIT", "--license-type", help="License type for documentation files (MIT, Apache-2.0, GPL-3.0)"
+        "MIT",
+        "--license-type",
+        help="License type for documentation files (MIT, Apache-2.0, GPL-3.0)",
     ),
     no_venv: bool = typer.Option(
         False, "--no-venv", help="Skip virtual environment creation"
@@ -244,7 +284,28 @@ def pg_backup(
     _run_script("pg_backup_tool.py", args)
 
 
-@app.command()
+def is_playlist_url(url: str) -> bool:
+    """
+    Use yt-dlp to check if the URL is a playlist (returns more than one item).
+    """
+    try:
+        result = subprocess.run(
+            ["yt-dlp", "--flat-playlist", "--print", "id", url],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        ids = [line for line in result.stdout.strip().splitlines() if line]
+        return len(ids) > 1
+    except Exception as e:
+        # If yt-dlp fails, assume not a playlist
+        return False
+
+
+VALID_PLAYLIST_MODES = (None, "all", "items")
+
+
+@download_app.command("video")
 def download_video(
     url: Optional[str] = typer.Argument(
         None, help="The URL of the video to download or list formats for."
@@ -262,17 +323,17 @@ def download_video(
         "-l",
         help="List available formats for the URL instead of downloading.",
     ),
-    playlist_mode: str = typer.Option(
-        "download_all",
+    playlist_mode: Optional[str] = typer.Option(
+        None,
         "--playlist-mode",
         "-p",
-        help="Playlist handling: download_all, single, first_n, audio_only.",
+        help="Playlist handling: all (entire playlist), items (specific items).",
     ),
     items: Optional[str] = typer.Option(
         None,
         "--items",
         "-i",
-        help="Download specific items from a playlist (e.g., '5', '2-4,8'). Works with --playlist-mode audio_only.",
+        help="Download specific items from a playlist (e.g., '1-5,7,9,11'). Use with --playlist-mode items.",
     ),
     create_config: bool = typer.Option(
         False, "--create-config", help="Create a default configuration file and exit."
@@ -292,49 +353,268 @@ def download_video(
         help="Path to a download archive file to record downloaded files.",
     ),
 ):
-    """
-    Downloads video or audio from a URL using yt-dlp, with advanced options.
-    """
-    args = []
-
-    # Handle standalone commands first
-    if create_config:
-        args.append("--create-config")
-        _run_script("video_downloader.py", args)
-        return
-
-    # A URL is required for any other action
-    if not url:
-        print("❌ Error: A URL is required unless using '--create-config'.")
+    """Download video from a URL using yt-dlp."""
+    # --- Playlist mode validation ---
+    if playlist_mode not in VALID_PLAYLIST_MODES:
+        typer.echo(
+            f"❌ Error: --playlist-mode '{playlist_mode}' is not supported. Use 'all' or 'items'.",
+            err=True,
+        )
         raise typer.Exit(1)
 
-    args.append(url)
-
-    if list_formats:
-        args.append("--list-formats")
-        _run_script("video_downloader.py", args)
-        return
-
-    # For downloads, add the remaining arguments
+    args = []
+    if url:
+        args.append(url)
     if output_name:
         args.append(output_name)
-
-    args.extend(["--quality", quality])
-    args.extend(["--playlist-mode", playlist_mode])
-
+    if quality:
+        args.extend(["--quality", quality])
+    if list_formats:
+        args.append("--list-formats")
+    if create_config:
+        args.append("--create-config")
     if no_config:
         args.append("--no-config")
-
-    if items:
-        args.extend(["--items", items])
-
     if browser:
         args.extend(["--browser", browser])
-
     if archive:
         args.extend(["--archive", str(archive)])
 
+    # Check if URL is a playlist
+    is_playlist = is_playlist_url(url) if url else False
+
+    # Validate playlist mode usage
+    if playlist_mode in ("all", "items"):
+        if not is_playlist:
+            typer.echo(
+                "❌ Error: --playlist-mode requires a playlist URL (yt-dlp detected this is not a playlist).",
+                err=True,
+            )
+            raise typer.Exit(1)
+        if playlist_mode == "items" and not items:
+            typer.echo(
+                "❌ Error: --playlist-mode items requires --items parameter", err=True
+            )
+            raise typer.Exit(1)
+        if playlist_mode == "all":
+            args.extend(["--playlist-mode", "download_all_video"])
+        elif playlist_mode == "items":
+            args.extend(["--playlist-mode", "items_video"])
+            args.extend(["--items", items])
+    else:
+        # No playlist mode specified - download only the first video
+        args.extend(["--playlist-mode", "single"])
+
+        _run_script("video_downloader.py", args)
+
+
+@download_app.command("audio")
+def download_audio(
+    url: Optional[str] = typer.Argument(
+        None, help="The URL of the audio to download or list formats for."
+    ),
+    output_name: Optional[str] = typer.Argument(
+        None, help="Optional output filename (for single video only)."
+    ),
+    list_formats: bool = typer.Option(
+        False,
+        "--list-formats",
+        "-l",
+        help="List available formats for the URL instead of downloading.",
+    ),
+    playlist_mode: Optional[str] = typer.Option(
+        None,
+        "--playlist-mode",
+        "-p",
+        help="Playlist handling: all (entire playlist), items (specific items).",
+    ),
+    items: Optional[str] = typer.Option(
+        None,
+        "--items",
+        "-i",
+        help="Download specific items from a playlist (e.g., '1-5,7,9,11'). Use with --playlist-mode items.",
+    ),
+    create_config: bool = typer.Option(
+        False, "--create-config", help="Create a default configuration file and exit."
+    ),
+    no_config: bool = typer.Option(
+        False, "--no-config", help="Run without loading settings from the config file."
+    ),
+    browser: Optional[str] = typer.Option(
+        None,
+        "--browser",
+        "-b",
+        help="Browser to use for cookies (brave, chrome, firefox, etc.).",
+    ),
+    archive: Optional[Path] = typer.Option(
+        None,
+        "--archive",
+        help="Path to a download archive file to record downloaded files.",
+    ),
+):
+    """Download audio from a URL using yt-dlp."""
+    # --- Playlist mode validation ---
+    if playlist_mode not in VALID_PLAYLIST_MODES:
+        typer.echo(
+            f"❌ Error: --playlist-mode '{playlist_mode}' is not supported. Use 'all' or 'items'.",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    args = []
+    if url:
+        args.append(url)
+    if output_name:
+        args.append(output_name)
+    if list_formats:
+        args.append("--list-formats")
+    if create_config:
+        args.append("--create-config")
+    if no_config:
+        args.append("--no-config")
+    if browser:
+        args.extend(["--browser", browser])
+    if archive:
+        args.extend(["--archive", str(archive)])
+
+    # Check if URL is a playlist
+    is_playlist = is_playlist_url(url) if url else False
+
+    # Validate playlist mode usage
+    if playlist_mode in ("all", "items"):
+        if not is_playlist:
+            typer.echo(
+                "❌ Error: --playlist-mode requires a playlist URL (yt-dlp detected this is not a playlist).",
+                err=True,
+            )
+            raise typer.Exit(1)
+        if playlist_mode == "items" and not items:
+            typer.echo(
+                "❌ Error: --playlist-mode items requires --items parameter", err=True
+            )
+            raise typer.Exit(1)
+        if playlist_mode == "all":
+            args.extend(["--playlist-mode", "download_all_audio"])
+        elif playlist_mode == "items":
+            args.extend(["--playlist-mode", "items_audio"])
+            args.extend(["--items", items])
+    else:
+        # No playlist mode specified - download only the first video
+        args.extend(["--playlist-mode", "audio_only"])
+
     _run_script("video_downloader.py", args)
+
+
+@download_app.command("file")
+def download_file(
+    url: str = typer.Argument(..., help="The URL of the file to download."),
+    output_name: Optional[str] = typer.Argument(None, help="Optional output filename."),
+    output_dir: Optional[str] = typer.Option(
+        None,
+        "--output-dir",
+        "-o",
+        help="Directory to save the file (default: ~/Downloads).",
+    ),
+    method: str = typer.Option(
+        "auto",
+        "--method",
+        "-m",
+        help="Download method: auto, wget, curl (default: auto).",
+    ),
+    resume: bool = typer.Option(
+        True,
+        "--resume/--no-resume",
+        help="Resume interrupted downloads (default: enabled).",
+    ),
+    quiet: bool = typer.Option(
+        False, "--quiet", "-q", help="Suppress output (quiet mode)."
+    ),
+):
+    """Download files (ebooks, audiobooks, images, torrents, etc.) using wget or curl."""
+    args = [url]
+    if output_name:
+        args.extend(["--output-name", output_name])
+    if output_dir:
+        args.extend(["--output-dir", output_dir])
+    if method != "auto":
+        args.extend(["--method", method])
+    if not resume:
+        args.append("--no-resume")
+    if quiet:
+        args.append("--quiet")
+
+    _run_script("file_downloader.py", args)
+
+
+@download_app.command("torrent")
+def download_torrent(
+    torrents: Optional[List[str]] = typer.Argument(
+        None, help="One or more .torrent files or magnet links."
+    ),
+    output_dir: Optional[str] = typer.Option(
+        None,
+        "--output-dir",
+        "-o",
+        help="Directory to save the downloaded files (default: ~/Downloads/Torrents).",
+    ),
+    seed: bool = typer.Option(
+        False,
+        "--seed",
+        help="Continue seeding after download completes (default: False).",
+    ),
+    max_connections: Optional[int] = typer.Option(
+        None,
+        "--max-connections",
+        "-c",
+        help="Maximum number of connections per server (1-16).",
+    ),
+    max_download: Optional[str] = typer.Option(
+        None, "--max-download", "-d", help="Maximum download speed (e.g., 1M, 500K)."
+    ),
+    max_upload: Optional[str] = typer.Option(
+        None,
+        "--max-upload",
+        "-u",
+        help="Maximum upload speed (e.g., 500K, 0 for unlimited).",
+    ),
+    session_file: Optional[str] = typer.Option(
+        None, "--session", help="Path to aria2c session file for pause/resume."
+    ),
+    pause: bool = typer.Option(
+        False, "--pause", help="Pause all downloads (not implemented, placeholder)."
+    ),
+    resume: bool = typer.Option(
+        False, "--resume", help="Resume all downloads (not implemented, placeholder)."
+    ),
+    quiet: bool = typer.Option(
+        False, "--quiet", help="Suppress aria2c output except errors."
+    ),
+    create_config: bool = typer.Option(
+        False, "--create-config", help="Create a default configuration file and exit."
+    ),
+):
+    args = []
+    if output_dir:
+        args.extend(["--output-dir", output_dir])
+    if max_connections:
+        args.extend(["--max-connections", str(max_connections)])
+    if max_download:
+        args.extend(["--max-download", max_download])
+    if max_upload:
+        args.extend(["--max-upload", max_upload])
+    if session_file:
+        args.extend(["--session", session_file])
+    if pause:
+        args.append("--pause")
+    if resume:
+        args.append("--resume")
+    if quiet:
+        args.append("--quiet")
+    if create_config:
+        args.append("--create-config")
+    if torrents:
+        args.extend(torrents)
+    _run_script("torrent_downloader.py", args)
 
 
 @subtitle_app.command("sync")
@@ -588,7 +868,9 @@ def gist_download(
         ..., help="Gist ID or full gist URL to download."
     ),
     output_dir: Optional[str] = typer.Option(
-        None, "--output-dir", help="Directory to save the gist files (default: ./gist-<id>)."
+        None,
+        "--output-dir",
+        help="Directory to save the gist files (default: ./gist-<id>).",
     ),
 ):
     """

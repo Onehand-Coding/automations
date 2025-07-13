@@ -422,13 +422,12 @@ if __name__ == "__main__":
         "download", help="Download a gist by ID or URL."
     )
     download_parser.add_argument(
-        "gist_id_or_url",
-        help="Gist ID or full gist URL to download."
+        "gist_id_or_url", help="Gist ID or full gist URL to download."
     )
     download_parser.add_argument(
         "--output-dir",
         default=None,
-        help="Directory to save the gist files (default: ./gist-<id>)."
+        help="Directory to save the gist files (default: ./gist-<id>).",
     )
 
     args = parser.parse_args()
