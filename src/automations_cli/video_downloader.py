@@ -9,7 +9,6 @@ import configparser
 from pathlib import Path
 from urllib.parse import urlparse
 from typing import Optional, Dict, Any
-import typer
 
 try:
     from helper.configs import setup_logging
@@ -137,11 +136,15 @@ def handle_playlist_options(
     elif playlist_mode == "first_n" and not playlist_items:
         command.extend(["--playlist-end", "5"])
     elif playlist_mode == "download_all_video":
-        logger.info("Setting download mode to video (entire playlist as separate files).")
+        logger.info(
+            "Setting download mode to video (entire playlist as separate files)."
+        )
         # No special flags needed for video downloads
         pass
     elif playlist_mode == "items_video":
-        logger.info("Setting download mode to video (specific items as separate files).")
+        logger.info(
+            "Setting download mode to video (specific items as separate files)."
+        )
         # No special flags needed for video downloads
         pass
     elif playlist_mode == "audio_only":
@@ -151,12 +154,16 @@ def handle_playlist_options(
             ["-f", "bestaudio/best", "--extract-audio", "--audio-format", "mp3"]
         )
     elif playlist_mode == "download_all_audio":
-        logger.info("Setting download mode to audio only (entire playlist as separate files).")
+        logger.info(
+            "Setting download mode to audio only (entire playlist as separate files)."
+        )
         command.extend(
             ["-f", "bestaudio/best", "--extract-audio", "--audio-format", "mp3"]
         )
     elif playlist_mode == "items_audio":
-        logger.info("Setting download mode to audio only (specific items as separate files).")
+        logger.info(
+            "Setting download mode to audio only (specific items as separate files)."
+        )
         command.extend(
             ["-f", "bestaudio/best", "--extract-audio", "--audio-format", "mp3"]
         )
@@ -240,12 +247,12 @@ def download(
 
     final_output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Fix: Add appropriate extension for audio downloads
+    # Add appropriate extension for audio downloads
     if output_name and not Path(output_name).suffix:
         if playlist_mode in ["audio_only", "download_all_audio", "items_audio"]:
             final_output_path = final_output_path.with_suffix(".mp3")
         else:
-        final_output_path = final_output_path.with_suffix(".mp4")
+            final_output_path = final_output_path.with_suffix(".mp4")
 
     logger.info(f"Final output path determined: {final_output_path}")
     command.extend(["-o", str(final_output_path)])
@@ -339,7 +346,9 @@ def is_playlist_url(url: str) -> bool:
     try:
         result = subprocess.run(
             ["yt-dlp", "--flat-playlist", "--print", "id", url],
-            capture_output=True, text=True, timeout=15
+            capture_output=True,
+            text=True,
+            timeout=15,
         )
         ids = [line for line in result.stdout.strip().splitlines() if line]
         return len(ids) > 1
@@ -370,9 +379,14 @@ if __name__ == "__main__":
         "--playlist-mode",
         default="download_all",
         choices=[
-            "download_all", "single", "first_n",
-            "download_all_video", "items_video",
-            "audio_only", "download_all_audio", "items_audio"
+            "download_all",
+            "single",
+            "first_n",
+            "download_all_video",
+            "items_video",
+            "audio_only",
+            "download_all_audio",
+            "items_audio",
         ],
         help="How to handle playlists.",
     )

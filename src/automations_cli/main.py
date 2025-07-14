@@ -65,7 +65,7 @@ def _run_script(script_name: str, args: list[str] = [], use_sudo: bool = False):
             fg=typer.colors.YELLOW,
         )
 
-    typer.echo(f"▶️  Running: {' '.join(command)}")
+    # typer.echo(f"▶️  Running: {' '.join(command)}")  # This is noise
     # We use .call here instead of .run to allow the script to be interactive (e.g., for password prompts)
     subprocess.call(command)
 
@@ -592,6 +592,12 @@ def download_torrent(
     create_config: bool = typer.Option(
         False, "--create-config", help="Create a default configuration file and exit."
     ),
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        "-v",
+        help="Enable verbose output and debug messages to the log file.",
+    ),
 ):
     args = []
     if output_dir:
@@ -604,6 +610,8 @@ def download_torrent(
         args.extend(["--max-upload", max_upload])
     if session_file:
         args.extend(["--session", session_file])
+    if torrents:
+        args.extend(torrents)
     if pause:
         args.append("--pause")
     if resume:
@@ -612,8 +620,10 @@ def download_torrent(
         args.append("--quiet")
     if create_config:
         args.append("--create-config")
-    if torrents:
-        args.extend(torrents)
+    if seed:
+        args.append("--seed")
+    if verbose:
+        args.append("--verbose")
     _run_script("torrent_downloader.py", args)
 
 
