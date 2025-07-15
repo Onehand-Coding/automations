@@ -32,16 +32,6 @@ app.add_typer(subtitle_app)
 app.add_typer(gist_app)
 app.add_typer(download_app)
 
-TORRENT_CONFIG_FILE = Path.home() / ".torrent_downloader_config.ini"
-TORRENT_DEFAULT_CONFIG = {
-    "output_dir": str(Path.home() / "Downloads" / "Torrents"),
-    "max_connections": "16",
-    "max_download": "",
-    "max_upload": "",
-    "seed": "false",
-    "session_file": str(Path.home() / ".aria2.session"),
-}
-
 
 # --- Helper Function to Run Scripts ---
 def _run_script(script_name: str, args: list[str] = [], use_sudo: bool = False):
@@ -68,24 +58,6 @@ def _run_script(script_name: str, args: list[str] = [], use_sudo: bool = False):
     # typer.echo(f"▶️  Running: {' '.join(command)}")  # This is noise
     # We use .call here instead of .run to allow the script to be interactive (e.g., for password prompts)
     subprocess.call(command)
-
-
-def load_torrent_config() -> dict:
-    """Load torrent configuration from config file."""
-    config = configparser.ConfigParser()
-    if TORRENT_CONFIG_FILE.exists():
-        config.read(TORRENT_CONFIG_FILE)
-        if "settings" in config:
-            return dict(config["settings"])
-    return TORRENT_DEFAULT_CONFIG.copy()
-
-
-def save_torrent_config(config_dict: dict):
-    """Save torrent configuration to config file."""
-    config = configparser.ConfigParser()
-    config["settings"] = config_dict
-    with open(TORRENT_CONFIG_FILE, "w") as f:
-        config.write(f)
 
 
 # --- CLI Commands ---
@@ -507,38 +479,43 @@ def download_audio(
 
 @download_app.command("file")
 def download_file(
-    url: str = typer.Argument(..., help="The URL of the file to download."),
-    output_name: Optional[str] = typer.Argument(None, help="Optional output filename."),
+    urls: List[str] = typer.Argument(..., help="One or more URLs to download."),
+    output_name: Optional[str] = typer.Option(
+        None,
+        "--output-name",
+        "-n",
+        help="Optional output filename (for single file only).",
+    ),
     output_dir: Optional[str] = typer.Option(
         None,
         "--output-dir",
         "-o",
-        help="Directory to save the file (default: ~/Downloads).",
+        help="Directory to save the file(s) (default: ~/Downloads).",
     ),
     method: str = typer.Option(
         "auto",
         "--method",
         "-m",
-        help="Download method: auto, wget, curl (default: auto).",
+        help="Download method: auto, aria2, wget, curl (default: auto).",
     ),
-    resume: bool = typer.Option(
-        True,
-        "--resume/--no-resume",
-        help="Resume interrupted downloads (default: enabled).",
+    no_resume: bool = typer.Option(
+        False,
+        "--no-resume",
+        help="Disable resume functionality (default: resume enabled).",
     ),
     quiet: bool = typer.Option(
         False, "--quiet", "-q", help="Suppress output (quiet mode)."
     ),
 ):
-    """Download files (ebooks, audiobooks, images, torrents, etc.) using wget or curl."""
-    args = [url]
+    """Download one or more files using aria2c, wget, or curl."""
+    args = urls
     if output_name:
         args.extend(["--output-name", output_name])
     if output_dir:
         args.extend(["--output-dir", output_dir])
     if method != "auto":
         args.extend(["--method", method])
-    if not resume:
+    if no_resume:
         args.append("--no-resume")
     if quiet:
         args.append("--quiet")
