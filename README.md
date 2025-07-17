@@ -8,12 +8,58 @@ A powerful, all-in-one command-line tool built with Python to automate everyday 
 * **Gist Management**: Upload, update, list, delete, and download GitHub Gists from the command line
 * **Database Management**: Automate PostgreSQL database backups and restores
 * **Cloud Sync**: Upload database backups directly to any `rclone` remote or Google Drive
-* **File Organization**: Clean up directories by sorting files based on their type and name
+* **File Organization**: Clean up directories by sorting files based on their type, extension, date, prefix, or stem
 * **System Utilities**: Retrieve saved Wi-Fi passwords, manage WireGuard VPN connections, or automatically install the correct `chromedriver` for your browser
 * **Google Photos**: Organize Google Photos Takeout archives
 * **Website Cloning**: Clone websites for offline viewing
 * **Modular Downloaders**: Download videos, audio, files, and torrents with robust, standalone scripts and consistent CLI options
 * **Subtitle Management**: Sync, shift, and embed subtitles into video files
+
+---
+
+## 📂 File Organization
+
+The Automations CLI includes a powerful file organizer tool to help you keep your directories tidy.
+
+### **Default Behavior**
+
+By default, the file organizer will **only organize files in the top-level folder** you specify.  
+If you want to organize files in all subfolders as well, use the `--recursive` flag.
+
+### **Usage**
+
+```sh
+# Organize only the top-level folder (default)
+automations organize-files /path/to/your/folder
+
+# Organize all files in the folder and all subfolders
+automations organize-files /path/to/your/folder --recursive
+
+# Use multiple sorting methods and exclude certain files/folders
+automations organize-files /path/to/your/folder --method by_type by_date --exclude node_modules .git
+
+# Perform a dry run (see what would happen, but make no changes)
+automations organize-files /path/to/your/folder --dry-run
+
+# Enable verbose output for detailed logs
+automations organize-files /path/to/your/folder --verbose
+```
+
+### **Options**
+
+| Option                | Description                                                                                  | Default                |
+|-----------------------|----------------------------------------------------------------------------------------------|------------------------|
+| `--method`, `-m`      | Sorting method(s) to use. Can specify multiple. Choices: `by_type`, `by_ext`, `by_date`, `by_prefix`, `by_stem` | `by_type`              |
+| `--recursive`, `-r`   | Sort files recursively in all subfolders                                                     | *Not set (top-level only)* |
+| `--dry-run`, `-d`     | Perform a dry run without actually moving files                                              | *Not set*              |
+| `--verbose`, `-v`     | Enable verbose output                                                                        | *Not set*              |
+| `--exclude`           | Files or folders to exclude from organization. Can specify multiple.                         | *None*                 |
+
+**Note:**  
+- The `--recursive` flag is now the only way to process subfolders.  
+- The `--simple` flag has been removed; "simple" (top-level only) is now the default.
+
+---
 
 ## 📥 Downloaders
 
@@ -46,6 +92,8 @@ automations download torrent "magnet:?..." --session ~/.aria2.session
 ```
 
 See `automations download <type> --help` for all options.
+
+---
 
 ## 🚀 Installation
 
@@ -89,6 +137,8 @@ This tool is designed to be installed and run from a dedicated Python virtual en
    uv pip install -e .
    ```
 
+---
+
 ## 🛠️ Configuration
 
 For commands that require credentials or specific paths, create a `.env` file in the project's root directory.
@@ -125,6 +175,8 @@ For commands that require credentials or specific paths, create a `.env` file in
   - Each downloader supports its own config file for default options (e.g., output directory, speed limits, session file for torrents).
   - See `~/.torrent_downloader_config.ini` and similar for details.
 
+---
+
 ## 📋 Usage
 
 All functionality is accessed through the main `automations` command.
@@ -147,7 +199,7 @@ automations --help
 | `generate-project`   | Generates a new project directory structure (with interactive mode)         |
 | `get-wifi-passwords` | Retrieves known Wi-Fi SSIDs and passwords                                   |
 | `install-chromedriver` | Downloads and installs the correct ChromeDriver                           |
-| `organize-files`     | Organizes files into subfolders based on extension                          |
+| `organize-files`     | Organizes files into subfolders based on extension, type, date, etc.        |
 | `pg-backup`          | PostgreSQL Backup/Restore Tool with Cloud Upload                            |
 | `process-takeout`    | Organizes a Google Photos Takeout archive                                   |
 | `run-wireguard`      | Interactive tool to activate and manage WireGuard VPN connections           |
@@ -199,102 +251,22 @@ Manage your GitHub Gists directly from the CLI:
 
 ---
 
-## 🛠️ Project Generator Examples
+## 📑 License
 
-* **Create a new project interactively:**
-  ```sh
-  automations generate-project --interactive
-  ```
-
-* **Create a new project without docs:**
-  ```sh
-  automations generate-project myproject --no-docs
-  ```
-
-* **Create a CLI tool project:**
-  ```sh
-  automations generate-project mycli --type cli
-  ```
+MIT License
 
 ---
 
-## 🗂️ Project Structure
+## 🙋‍♂️ Contributing
 
-```
-automations/
-├── src/                     # Source code
-│   │
-│   └── automations_cli/     # Main package
-│       ├── __init__.py
-│       ├── main.py          # CLI entry point
-│       ├── helper/          # Shared utilities
-│       │   ├── __init__.py
-│       │   ├── configs.py   # Configuration helpers
-│       │   ├── funcs.py     # Common functions
-│       │   └── templates.py # Template utilities
-│       ├── docs_generator.py
-│       ├── file_organizer.py
-│       ├── file_downloader.py      # Modular file downloader
-│       ├── gist_manager.py
-│       ├── gphotos_takeout_organizer.py
-│       ├── install_chromedriver.py
-│       ├── pg_backup_tool.py
-│       ├── project_generator.py
-│       ├── subtitle_manager.py
-│       ├── torrent_downloader.py   # Modular torrent downloader
-│       ├── video_downloader.py     # Modular video/audio downloader
-│       ├── wayfay.py
-│       ├── website_cloner.py
-│       └── wg_activate.py
-├── data/                    # Application data
-│   ├── backup-tool/         # Database backups & credentials
-│   │   ├── credentials.json
-│   │   ├── token.pickle
-│   │   └── db/              # Database backup files
-│   │       ├── db_backup_20250510_093801.dump
-│   │       ├── db_backup_20250518_070156.dump
-│   │       └── db_backup_20250704_165920.dump
-│   └── wifi_passwords.json  # Stored Wi-Fi passwords
-├── logs/                    # Application logs
-│   ├── backup_tool.log
-│   ├── chromedriver_installer.log
-│   ├── docs_generator.log
-│   ├── file_organizer.log
-│   ├── file_downloader.log
-│   ├── gist_uploader.log
-│   ├── project_generator.log
-│   ├── subtitle_manager.log
-│   ├── torrent_downloader.log
-│   ├── video_downloader.log
-│   └── wireguard_activator_.log
-├── pyproject.toml          # Project configuration
-├── README.md               # Project documentation
-└── uv.lock                 # UV lock file
-```
+Contributions are welcome! Please open an issue or submit a pull request.
 
 ---
 
-## 🔧 Development
+## 🗒️ Notes
 
-To contribute or modify the tool:
-
-1. **Fork and clone the repository**
-2. **Set up the development environment:**
-   ```sh
-   uv sync
-
-   # or
-
-   uv venv
-   source .venv/bin/activate
-   uv pip install -e .
-   ```
-3. **Make your changes** in the `automations_cli/` directory
-4. **Test your changes** by running the CLI commands
-5. **Submit a pull request**
+- This project is under active development and is tailored for personal automation needs.
+- Some features require external tools to be installed and available in your system PATH.
+- For any issues or feature requests, please open an issue on GitHub.
 
 ---
-
-## 🤝 Contributing
-
-This repository is primarily for personal learning and utility. However, suggestions or improvements are welcome. Feel free to open an issue or submit a pull request.

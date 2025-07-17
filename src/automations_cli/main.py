@@ -135,12 +135,55 @@ def generate_project(
 
 @app.command()
 def organize_files(
-    directory: str = typer.Argument(
-        ".", help="The directory to organize. Defaults to current."
+    folder_path: str = typer.Argument(
+        ".", help="Absolute path for folder you wish to organize files from."
+    ),
+    method: List[str] = typer.Option(
+        ["by_type"],
+        "--method",
+        "-m",
+        help="Sorting method(s) to use. Can specify multiple methods. Choices: by_type, by_ext, by_date, by_prefix, by_stem.",
+    ),
+    recursive: bool = typer.Option(
+        False,
+        "--recursive",
+        "-r",
+        help="Sort files recursively in all subfolders (default: only top-level folder)",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        "-d",
+        help="Perform a dry run without actually moving files",
+    ),
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        "-v",
+        help="Enable verbose output",
+    ),
+    exclude: List[str] = typer.Option(
+        None,
+        "--exclude",
+        help="Files or folders to exclude from organization. Can specify multiple.",
     ),
 ):
-    """Organizes files into subfolders based on extension."""
-    _run_script("file_organizer.py", [directory])
+    """
+    Organizes files in a directory with advanced options.
+    """
+    args = [folder_path]
+    if method:
+        args.extend(["--method"] + method)
+    if recursive:
+        args.append("--recursive")
+    if dry_run:
+        args.append("--dry-run")
+    if verbose:
+        args.append("--verbose")
+    if exclude:
+        args.extend(["--exclude"] + list(exclude))
+
+    _run_script("file_organizer.py", args)
 
 
 @app.command()
