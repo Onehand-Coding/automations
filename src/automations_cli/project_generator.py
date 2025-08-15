@@ -15,14 +15,6 @@ from helper.templates import (
     GITIGNORE_TEMPLATE,
 )
 
-# def confirm(prompt):
-#     """Get user confirmation."""
-#     while True:
-#         reply = input(f"{prompt} [y/N]: ").lower().strip()
-#         if reply in ["y", "yes"]:
-#             return True
-#         if reply in ["n", "no", ""]:
-#             return False
 
 DEFAULT_PROJECTS_DIR = os.path.join(
     os.getenv("DEFAULT_PROJECTS_DIR", os.path.expanduser("~/Coding")), "projects"
