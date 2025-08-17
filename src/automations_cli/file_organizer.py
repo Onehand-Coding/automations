@@ -101,11 +101,10 @@ class FileTypes(Enum):
 class SortMethod(Enum):
     """Enum for sorting methods."""
 
-    BY_TYPE = "by_type"
-    BY_EXT = "by_ext"
-    BY_DATE = "by_date"
-    BY_STEM = "by_stem"
-    BY_PREFIX = "by_prefix"
+    BY_TYPE = "type"
+    BY_EXT = "extension"
+    BY_DATE = "date"
+    BY_STEM = "name"
 
 
 class FileOrganizer:
@@ -246,8 +245,9 @@ class FileOrganizer:
             self.log_verbose(f"[DRY RUN] Would move {file} to {dest}")
             return True
 
+        folder_created = not dest.exists()
         dest.mkdir(parents=True, exist_ok=True)
-        self.stats.created_folders += 1 if not dest.exists() else 0
+        self.stats.created_folders += 1 if folder_created else 0
 
         if destination_file.exists() and not destination_file.samefile(file):
             destination_file = new_filepath(destination_file, add_prefix="_Duplicate")
@@ -315,41 +315,7 @@ class FileOrganizer:
 
         self.stats.method_stats["by_date"] = len(unsorted_files)
 
-    def sort_by_prefix(self, folder: Path = None) -> None:
-        """Sort files by their prefix."""
-        self.log_verbose(f"Starting sort by prefix in {folder or 'all folders'}...")
-        target_folder = folder or self.to_sort_path
-
-        if self.recursive and folder is None:
-            folders_to_process = [self.to_sort_path] + self.get_folders()
-        else:
-            folders_to_process = [target_folder]
-
-        total_processed = 0
-        for current_folder in folders_to_process:
-            unsorted_files = self.get_files(current_folder)
-            if not unsorted_files:
-                continue
-
-            prefix_folders = defaultdict(list)
-            for file in unsorted_files:
-                prefix = get_split_stem(SPLIT_PATTERN, TO_REPLACE_PATTERN, file.stem)[0]
-                prefix_folders[prefix].append(file)
-
-            if len(prefix_folders) > 1:
-                for prefix, files in prefix_folders.items():
-                    if len(files) > 1:
-                        for file in files:
-                            if prefix not in file.parts:
-                                prefix_folder = file.parent / prefix
-                                self.move_file(file, prefix_folder)
-                                self.destination_folders.add(prefix_folder)
-                                total_processed += 1
-                                self.update_progress("Sorting by prefix")
-
-        self.stats.method_stats["by_prefix"] = total_processed
-
-    def sort_by_stem(self, folder: Path = None) -> None:
+    def sort_by_name(self, folder: Path = None) -> None:
         """Sort files by common stems in their names."""
         self.log_verbose(f"Starting sort by stem in {folder or 'all folders'}...")
         target_folder = folder or self.to_sort_path
@@ -430,10 +396,8 @@ class FileOrganizer:
                 self.sort_by_extension()
             elif method == SortMethod.BY_DATE:
                 self.sort_by_date()
-            elif method == SortMethod.BY_PREFIX:
-                self.sort_by_prefix()
             elif method == SortMethod.BY_STEM:
-                self.sort_by_stem()
+                self.sort_by_name()
 
         # Remove empty folders if not dry run
         if not self.dry_run:
@@ -586,7 +550,7 @@ def main() -> None:
         "-m",
         nargs="+",
         choices=[method.value for method in SortMethod],
-        default=["by_type"],
+        default=["type"],
         help="Sorting method(s) to use. Can specify multiple methods.",
     )
     parser.add_argument(

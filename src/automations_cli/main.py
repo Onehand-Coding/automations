@@ -136,13 +136,13 @@ def generate_project(
 @app.command()
 def organize_files(
     folder_path: str = typer.Argument(
-        ".", help="Absolute path for folder you wish to organize files from."
+        help="Absolute path for folder you wish to organize files from."
     ),
     method: List[str] = typer.Option(
-        ["by_type"],
+        ["type"],
         "--method",
         "-m",
-        help="Sorting method(s) to use. Can specify multiple methods. Choices: by_type, by_ext, by_date, by_prefix, by_stem.",
+        help="Sorting method(s) to use. Can specify multiple methods. Choices: type, extension, date, name.",
     ),
     recursive: bool = typer.Option(
         False,
