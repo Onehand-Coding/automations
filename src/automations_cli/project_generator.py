@@ -122,17 +122,17 @@ if __name__ == "__main__":
 ''')
 
 
-def create_minimal_pyproject_toml(
+def create_pyproject_toml(
     project_name,
     package_name,
     use_src_layout,
     is_app,
     is_cli,
     has_readme,
-    author,
-    email,
     description,
     license_type,
+    author="Onehand-Coding",
+    email="onehand.coding433@gmail.com"
 ):
     """Create a pyproject.toml file using the template."""
     readme_line = 'readme = "README.md"\n' if has_readme else ""
@@ -149,10 +149,10 @@ dependencies = []
         pyproject_content = PYPROJECT_TEMPLATE.format(
             project_name=project_name,
             package_name=package_name,
+            description=description,
             license=license_type,
             author=author,
             email=email,
-            description=description,
         )
         if is_cli:
             main_path = f"{package_name}.main:main"
@@ -177,7 +177,7 @@ dependencies = []
     logger.info("Created pyproject.toml.")
 
 
-def create_license_file(license_type, author):
+def create_license_file(license_type, author="Onehand-Coding"):
     """Create a LICENSE file using the template."""
     year = datetime.now().year
     content = LICENSE_TEMPLATES.get(
@@ -362,13 +362,13 @@ Examples:
     )
     parser.add_argument(
         "--author",
-        default=None,
-        help="Author name for LICENSE and pyproject.toml (default: Your Name)",
+        default="Onehand-Coding",
+        help="Author name for LICENSE and pyproject.toml (default: Onehand-Coding)",
     )
     parser.add_argument(
         "--email",
-        default=None,
-        help="Author email for pyproject.toml (default: your.email@example.com)",
+        default="onehand.coding433@gmail.com",
+        help="Author email for pyproject.toml (default: onehand.coding433@gmail.com)",
     )
     parser.add_argument(
         "--license-type",
@@ -405,9 +405,9 @@ Examples:
         args.description = prompt_if_missing(
             args.description, "Project description", default="Add your description here"
         )
-        args.author = prompt_if_missing(args.author, "Author name", default="Your Name")
+        args.author = prompt_if_missing(args.author, "Author name", default="Onehand-Coding")
         args.email = prompt_if_missing(
-            args.email, "Author email", default="your.email@example.com"
+            args.email, "Author email", default="onehand.coding433@gmail.com"
         )
         args.license_type = prompt_if_missing(
             args.license_type,
@@ -502,17 +502,17 @@ Examples:
         # Create all docs and pyproject.toml
         create_readme(project_name, package_name, args.description, args.license_type)
         create_license_file(args.license_type, args.author)
-        create_minimal_pyproject_toml(
+        create_pyproject_toml(
             project_name,
             package_name,
             use_src_layout,
             is_app,
             is_cli,
             True,  # always has_readme
-            args.author,
-            args.email,
             args.description,
             args.license_type,
+            args.author,
+            args.email,
         )
         # Set up environment and dependencies
         setup_dependencies(create_venv)

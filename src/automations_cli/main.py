@@ -83,10 +83,10 @@ def generate_project(
         help="Project description for README and pyproject.toml",
     ),
     author: str = typer.Option(
-        "Your Name", "--author", help="Author name for LICENSE and pyproject.toml"
+        "Onehand-Coding", "--author", help="Author name for LICENSE and pyproject.toml"
     ),
     email: str = typer.Option(
-        "your.email@example.com", "--email", help="Author email for pyproject.toml"
+        "onehand.coding433@gmail.com", "--email", help="Author email for pyproject.toml"
     ),
     license_type: str = typer.Option(
         "MIT",
@@ -742,10 +742,10 @@ def generate_docs(
         help="Project description for README and pyproject.toml",
     ),
     author: str = typer.Option(
-        "Your Name", "--author", help="Author name for LICENSE and pyproject.toml"
+        "Onehand-Coding", "--author", help="Author name for LICENSE and pyproject.toml"
     ),
     email: str = typer.Option(
-        "your.email@example.com", "--email", help="Author email for pyproject.toml"
+        "onehand.coding433@gmail.com", "--email", help="Author email for pyproject.toml"
     ),
     license_type: str = typer.Option(
         "MIT", "--license-type", help="License type: MIT, Apache-2.0, GPL-3.0"

@@ -33,14 +33,14 @@ def create_readme(
         raise
 
 
-def create_pyproject(
+def create_pyproject_toml(
     output_dir: Path,
     project_name: str,
     package_name: str,
     license: str,
-    author: str,
-    email: str,
     description: str,
+    author: str = "Onehand-Coding",
+    email: str = "onehand.coding433@gmail.com",
 ) -> None:
     """Create a pyproject.toml file."""
     pyproject_path = output_dir / "pyproject.toml"
@@ -71,7 +71,7 @@ def create_gitignore(output_dir: Path) -> None:
         raise
 
 
-def create_license_file(output_dir: Path, license_type: str, author: str) -> None:
+def create_license_file(output_dir: Path, license_type: str, author: str = "Onehand-Coding") -> None:
     """Create a LICENSE file based on the specified license type."""
     license_path = output_dir / "LICENSE"
     year = datetime.now().year
@@ -117,7 +117,7 @@ def validate_args(args: argparse.Namespace) -> None:
 
     # Check for invalid use of --author or --email
     uses_author_or_email = (
-        args.author != "Your Name" or args.email != "your.email@example.com"
+        args.author != "Onehand-Coding" or args.email != "onehand.coding433@gmail.com"
     )
     needs_author_or_email = args.all or args.readme or args.license or args.pyproject
     if uses_author_or_email and not needs_author_or_email:
@@ -197,13 +197,13 @@ Examples:
     )
     parser.add_argument(
         "--author",
-        default="Your Name",
-        help="Author name for LICENSE and pyproject.toml (default: Your Name)",
+        default="Onehand-Coding",
+        help="Author name for LICENSE and pyproject.toml (default: Onehand-Coding)",
     )
     parser.add_argument(
         "--email",
-        default="your.email@example.com",
-        help="Author email for pyproject.toml (default: your.email@example.com)",
+        default="onehand.coding433@gmail.com",
+        help="Author email for pyproject.toml (default: onehand.coding433@gmail.com)",
     )
     parser.add_argument(
         "--license-type",
@@ -234,14 +234,14 @@ Examples:
                 output_dir, args.project_name, args.license_type, args.description
             )
         if args.all or args.pyproject:
-            create_pyproject(
+            create_pyproject_toml(
                 output_dir,
                 args.project_name,
                 package_name,
                 args.license_type,
+                args.description,
                 args.author,
                 args.email,
-                args.description,
             )
         if args.all or args.gitignore:
             create_gitignore(output_dir)
