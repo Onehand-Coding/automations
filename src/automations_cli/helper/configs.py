@@ -38,6 +38,9 @@ DATA_DIR.mkdir(exist_ok=True)
 LOG_DIR = ROOT_DIR / "logs"
 LOG_DIR.mkdir(exist_ok=True)
 
+CONFIG_DIR = Path.home() / ".config" / "automations"
+CONFIG_DIR.mkdir(exist_ok=True)
+
 
 def setup_logging(
     log_level: str = "DEBUG", log_file: str = "script.log"

@@ -132,7 +132,7 @@ def create_pyproject_toml(
     description,
     license_type,
     author="Onehand-Coding",
-    email="onehand.coding433@gmail.com"
+    email="onehand.coding433@gmail.com",
 ):
     """Create a pyproject.toml file using the template."""
     readme_line = 'readme = "README.md"\n' if has_readme else ""
@@ -405,7 +405,9 @@ Examples:
         args.description = prompt_if_missing(
             args.description, "Project description", default="Add your description here"
         )
-        args.author = prompt_if_missing(args.author, "Author name", default="Onehand-Coding")
+        args.author = prompt_if_missing(
+            args.author, "Author name", default="Onehand-Coding"
+        )
         args.email = prompt_if_missing(
             args.email, "Author email", default="onehand.coding433@gmail.com"
         )

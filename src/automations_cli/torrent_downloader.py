@@ -9,18 +9,21 @@ import subprocess
 import configparser
 from pathlib import Path
 
-from helper import setup_logging
+try:
+    from helper.configs import setup_logging, CONFIG_DIR
+except ImportError:
+    from .helper.configs import setup_logging
 
 logger = setup_logging(log_file="torrent_downloader.log")
 
-TORRENT_CONFIG_FILE = Path.home() / ".torrent_downloader_config.ini"
+TORRENT_CONFIG_FILE = CONFIG_DIR / ".torrent_downloader_config.ini"
 TORRENT_DEFAULT_CONFIG = {
     "output_dir": str(Path.home() / "Downloads" / "Torrents"),
     "max_connections": "16",
     "max_download": "",
     "max_upload": "",
     "seed": "false",
-    "session_file": str(Path.home() / ".aria2.session"),
+    "session_file": str(CONFIG_DIR / ".aria2.session"),
 }
 
 

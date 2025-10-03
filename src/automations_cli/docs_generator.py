@@ -71,7 +71,9 @@ def create_gitignore(output_dir: Path) -> None:
         raise
 
 
-def create_license_file(output_dir: Path, license_type: str, author: str = "Onehand-Coding") -> None:
+def create_license_file(
+    output_dir: Path, license_type: str, author: str = "Onehand-Coding"
+) -> None:
     """Create a LICENSE file based on the specified license type."""
     license_path = output_dir / "LICENSE"
     year = datetime.now().year

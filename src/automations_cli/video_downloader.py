@@ -11,14 +11,14 @@ from urllib.parse import urlparse
 from typing import Optional, Dict, Any
 
 try:
-    from helper.configs import setup_logging
+    from helper.configs import setup_logging, CONFIG_DIR
 except ImportError:
     from .helper.configs import setup_logging
 
 logger = setup_logging(log_file="video_downloader.log")
 
 YT_DLP_DEFAULT_DIR = Path.home() / "Downloads" / "Yt-dlp"
-CONFIG_FILE = Path.home() / ".video_downloader_config.ini"
+CONFIG_FILE = CONFIG_DIR / ".video_downloader_config.ini"
 DEFAULT_CONFIG = {
     "default_quality": "best",
     "default_output_dir": str(YT_DLP_DEFAULT_DIR),
