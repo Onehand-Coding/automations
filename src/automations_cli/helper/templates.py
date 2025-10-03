@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 README_TEMPLATE = """# {project_name}
 
-A {description} project.
+{description}
 
 ## Installation
 

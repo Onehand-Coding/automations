@@ -7,6 +7,7 @@ from datetime import datetime
 
 from helper import setup_logging, confirm
 from helper.templates import (
+    DEFAULT_LICENSE,
     LICENSE_TEMPLATES,
     README_TEMPLATE,
     PYPROJECT_TEMPLATE,

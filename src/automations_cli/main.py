@@ -134,6 +134,79 @@ def generate_project(
 
 
 @app.command()
+def generate_docs(
+    dir: str = typer.Option(
+        ".",
+        "--dir",
+        help="Output directory for documentation files (default: current directory)",
+    ),
+    all: bool = typer.Option(
+        False,
+        "--all",
+        help="Generate all documentation files (README.md, LICENSE, pyproject.toml, .gitignore)",
+    ),
+    readme: bool = typer.Option(False, "--readme", help="Generate README.md"),
+    license: bool = typer.Option(False, "--license", help="Generate LICENSE"),
+    pyproject: bool = typer.Option(
+        False, "--pyproject", help="Generate pyproject.toml"
+    ),
+    gitignore: bool = typer.Option(False, "--gitignore", help="Generate .gitignore"),
+    project_name: str = typer.Option(
+        "my_project",
+        "--project-name",
+        help="Project name for README and pyproject.toml",
+    ),
+    package_name: Optional[str] = typer.Option(
+        None,
+        "--package-name",
+        help="Package name for pyproject.toml (defaults to project-name)",
+    ),
+    description: str = typer.Option(
+        "Add your description here",
+        "--description",
+        help="Project description for README and pyproject.toml",
+    ),
+    author: str = typer.Option(
+        "Onehand-Coding", "--author", help="Author name for LICENSE and pyproject.toml"
+    ),
+    email: str = typer.Option(
+        "onehand.coding433@gmail.com", "--email", help="Author email for pyproject.toml"
+    ),
+    license_type: str = typer.Option(
+        "MIT", "--license-type", help="License type: MIT, Apache-2.0, GPL-3.0"
+    ),
+):
+    """Generates project documentation files (README.md, LICENSE, pyproject.toml, .gitignore)."""
+    args = [
+        "--dir",
+        dir,
+        "--project-name",
+        project_name,
+        "--description",
+        description,
+        "--author",
+        author,
+        "--email",
+        email,
+        "--license-type",
+        license_type,
+    ]
+    if all:
+        args.append("--all")
+    if readme:
+        args.append("--readme")
+    if license:
+        args.append("--license")
+    if pyproject:
+        args.append("--pyproject")
+    if gitignore:
+        args.append("--gitignore")
+    if package_name:
+        args.extend(["--package-name", package_name])
+    _run_script("docs_generator.py", args)
+
+
+@app.command()
 def organize_files(
     folder_path: str = typer.Argument(
         help="Absolute path for folder you wish to organize files from."
@@ -706,79 +779,6 @@ def subtitle_embed(
 def gist_list():
     """Lists existing GitHub Gists."""
     _run_script("gist_manager.py", ["list"])
-
-
-@app.command()
-def generate_docs(
-    dir: str = typer.Option(
-        ".",
-        "--dir",
-        help="Output directory for documentation files (default: current directory)",
-    ),
-    all: bool = typer.Option(
-        False,
-        "--all",
-        help="Generate all documentation files (README.md, LICENSE, pyproject.toml, .gitignore)",
-    ),
-    readme: bool = typer.Option(False, "--readme", help="Generate README.md"),
-    license: bool = typer.Option(False, "--license", help="Generate LICENSE"),
-    pyproject: bool = typer.Option(
-        False, "--pyproject", help="Generate pyproject.toml"
-    ),
-    gitignore: bool = typer.Option(False, "--gitignore", help="Generate .gitignore"),
-    project_name: str = typer.Option(
-        "my_project",
-        "--project-name",
-        help="Project name for README and pyproject.toml",
-    ),
-    package_name: Optional[str] = typer.Option(
-        None,
-        "--package-name",
-        help="Package name for pyproject.toml (defaults to project-name)",
-    ),
-    description: str = typer.Option(
-        "A Python project",
-        "--description",
-        help="Project description for README and pyproject.toml",
-    ),
-    author: str = typer.Option(
-        "Onehand-Coding", "--author", help="Author name for LICENSE and pyproject.toml"
-    ),
-    email: str = typer.Option(
-        "onehand.coding433@gmail.com", "--email", help="Author email for pyproject.toml"
-    ),
-    license_type: str = typer.Option(
-        "MIT", "--license-type", help="License type: MIT, Apache-2.0, GPL-3.0"
-    ),
-):
-    """Generates project documentation files (README.md, LICENSE, pyproject.toml, .gitignore)."""
-    args = [
-        "--dir",
-        dir,
-        "--project-name",
-        project_name,
-        "--description",
-        description,
-        "--author",
-        author,
-        "--email",
-        email,
-        "--license-type",
-        license_type,
-    ]
-    if all:
-        args.append("--all")
-    if readme:
-        args.append("--readme")
-    if license:
-        args.append("--license")
-    if pyproject:
-        args.append("--pyproject")
-    if gitignore:
-        args.append("--gitignore")
-    if package_name:
-        args.extend(["--package-name", package_name])
-    _run_script("docs_generator.py", args)
 
 
 @gist_app.command("upload")
