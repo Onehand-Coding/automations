@@ -24,7 +24,7 @@ def get_ssids() -> List[str]:
                 text=True,
                 check=True,
             )
-            ssids = re.findall(r"All User Profile\s+:\s+(.*)\r", result.stdout)
+            ssids = re.findall(r"All User Profile\s+:\s+(.*)", result.stdout)
         elif system == "Darwin":  # macOS
             result = subprocess.run(
                 [
@@ -93,7 +93,7 @@ def get_passwords(ssids: List[str]) -> List[Dict[str, str]]:
                     text=True,
                     check=False,
                 )
-                password_match = re.search(r"Key Content\s+:\s+(.*)\r", result.stdout)
+                password_match = re.search(r"Key Content\s+:\s+(.*)", result.stdout)
                 wifi_info["Password"] = (
                     password_match.group(1) if password_match else "No password"
                 )

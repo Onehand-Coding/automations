@@ -39,7 +39,7 @@ LOG_DIR = ROOT_DIR / "logs"
 LOG_DIR.mkdir(exist_ok=True)
 
 CONFIG_DIR = Path.home() / ".config" / "automations"
-CONFIG_DIR.mkdir(exist_ok=True)
+CONFIG_DIR.mkdir(exist_ok=True, parents=True)
 
 
 def setup_logging(
