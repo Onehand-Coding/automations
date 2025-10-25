@@ -348,6 +348,12 @@ Examples:
         default=None,
         help="Project type: app, cli, or lib (default: lib)",
     )
+    # Fullstack option
+    parser.add_argument(
+        "--fullstack",
+        action="store_true",
+        help="Create a fullstack project with FastAPI backend and React frontend",
+    )
     # Docs
     parser.add_argument(
         "--no-docs",
@@ -466,61 +472,99 @@ Examples:
         logger.error("Project name cannot be empty.")
         sys.exit(1)
 
-    project_path = Path(args.path or DEFAULT_PROJECTS_DIR).expanduser()
-    project_path.mkdir(exist_ok=True)
-
-    full_project_path = project_path / project_name
-    if full_project_path.exists():
-        if not confirm(f"Directory '{full_project_path}' already exists. Overwrite?"):
-            logger.info("Project creation cancelled.")
+    # Check if the fullstack option is selected
+    if args.fullstack:
+        # Import and run the fullstack generator
+        try:
+            import sys
+            import os
+            # Add the current directory to path to import the fullstack module
+            sys.path.append(os.path.dirname(__file__))
+            import fullstack
+            full_project_path = Path(args.path or DEFAULT_PROJECTS_DIR).expanduser() / project_name
+            full_project_path.mkdir(parents=True, exist_ok=True)
+            os.chdir(full_project_path)
+            fullstack.main(project_name)
+            
+            # Create Sublime Text project files for fullstack projects too
+            create_sublime_project(project_name)
+            
+            # Initialize Git repository for fullstack projects too
+            init_git_repo(args.no_git)
+            
+            # Optionally open in Sublime Text if requested
+            if args.open:
+                open_in_sublime(str(full_project_path))
+            
+            logger.info(f"Fullstack project '{project_name}' created successfully at {full_project_path}")
+            
+            # Print next steps for fullstack
+            logger.info("\nNext steps:")
+            logger.info(f"1. cd {full_project_path}")
+            logger.info("2. Backend: cd backend && uv sync && uv run dev")
+            logger.info("3. Frontend (in new terminal): cd frontend && npm install && npm run dev")
+            logger.info("4. Open http://localhost:5173 in your browser")
+            
             sys.exit(0)
-
-    # Change to the project's parent directory, then create and move into it.
-    os.chdir(project_path)
-    full_project_path.mkdir(exist_ok=True)
-    os.chdir(full_project_path)
-
-    logger.info(f"Creating project '{project_name}' in {full_project_path}...")
-
-    package_name = project_name.replace("-", "_")
-    create_venv = not args.no_venv
-
-    # Determine project type
-    is_app = args.type == "app"
-    is_cli = args.type == "cli"
-    use_src_layout = args.type in ("cli", "lib")
-
-    # Always create the basic project structure
-    create_project_files(project_name, package_name, is_app, is_cli, use_src_layout)
-    create_gitignore()
-    create_sublime_project(project_name)
-
-    if args.no_docs:
-        logger.warning(
-            "Skipping documentation generation. Project will not be buildable with uv/hatchling until you add the required files."
-        )
-        # Do NOT create pyproject.toml, README.md, LICENSE, or run setup_dependencies
+        except ImportError as e:
+            logger.error(f"Failed to import fullstack module: {e}")
+            sys.exit(1)
     else:
-        # Create all docs and pyproject.toml
-        create_readme(project_name, package_name, args.description, args.license_type)
-        create_license_file(args.license_type, args.author)
-        create_pyproject_toml(
-            project_name,
-            package_name,
-            use_src_layout,
-            is_app,
-            is_cli,
-            True,  # always has_readme
-            args.description,
-            args.license_type,
-            args.author,
-            args.email,
-        )
-        # Set up environment and dependencies
-        setup_dependencies(create_venv)
+        project_path = Path(args.path or DEFAULT_PROJECTS_DIR).expanduser()
+        project_path.mkdir(exist_ok=True)
 
-    # Initialize Git repository
-    init_git_repo(args.no_git)
+        full_project_path = project_path / project_name
+        if full_project_path.exists():
+            if not confirm(f"Directory '{full_project_path}' already exists. Overwrite?"):
+                logger.info("Project creation cancelled.")
+                sys.exit(0)
+
+        # Change to the project's parent directory, then create and move into it.
+        os.chdir(project_path)
+        full_project_path.mkdir(exist_ok=True)
+        os.chdir(full_project_path)
+
+        logger.info(f"Creating project '{project_name}' in {full_project_path}...")
+
+        package_name = project_name.replace("-", "_")
+        create_venv = not args.no_venv
+
+        # Determine project type
+        is_app = args.type == "app"
+        is_cli = args.type == "cli"
+        use_src_layout = args.type in ("cli", "lib")
+
+        # Always create the basic project structure
+        create_project_files(project_name, package_name, is_app, is_cli, use_src_layout)
+        create_gitignore()
+        create_sublime_project(project_name)
+
+        if args.no_docs:
+            logger.warning(
+                "Skipping documentation generation. Project will not be buildable with uv/hatchling until you add the required files."
+            )
+            # Do NOT create pyproject.toml, README.md, LICENSE, or run setup_dependencies
+        else:
+            # Create all docs and pyproject.toml
+            create_readme(project_name, package_name, args.description, args.license_type)
+            create_license_file(args.license_type, args.author)
+            create_pyproject_toml(
+                project_name,
+                package_name,
+                use_src_layout,
+                is_app,
+                is_cli,
+                True,  # always has_readme
+                args.description,
+                args.license_type,
+                args.author,
+                args.email,
+            )
+            # Set up environment and dependencies
+            setup_dependencies(create_venv)
+
+        # Initialize Git repository
+        init_git_repo(args.no_git)
 
     logger.info(
         f"\n✅ Project '{project_name}' created successfully at {full_project_path}"

@@ -72,6 +72,9 @@ def generate_project(
     type: str = typer.Option(
         "lib", "--type", help="Project type: app, cli, or lib (default: lib)"
     ),
+    fullstack: bool = typer.Option(
+        False, "--fullstack", help="Create a fullstack project with FastAPI backend and React frontend"
+    ),
     no_docs: bool = typer.Option(
         False,
         "--no-docs",
@@ -111,6 +114,8 @@ def generate_project(
         args.extend(["--path", path])
     if type:
         args.extend(["--type", type])
+    if fullstack:
+        args.append("--fullstack")
     if no_docs:
         args.append("--no-docs")
     if description:
