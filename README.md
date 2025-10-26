@@ -128,7 +128,7 @@ This tool is designed to be installed and run from a dedicated Python virtual en
 1. **Clone the repository:**
 
    ```sh
-   git clone https://github.com/Phoenix1025/automations.git
+   git clone https://github.com/Onehand-Coding/automations.git
    cd automations
    ```
 
