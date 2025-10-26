@@ -54,8 +54,8 @@ def create_backend(root: Path, project_name: str):
     """)
 
     # .env
-    create_file(backend / ".env", """
-    DATABASE_URL=sqlite:///./app.db
+    create_file(backend / ".env", f"""
+    DATABASE_URL=sqlite:///./{project_name}.db
     SECRET_KEY=your-secret-key-change-in-production
     DEBUG=True
     """)
@@ -183,7 +183,7 @@ if __name__ == "__main__":
     from pydantic_settings import BaseSettings, SettingsConfigDict
 
     class Settings(BaseSettings):
-        database_url: str = "sqlite:///./app.db"
+        database_url: str = "sqlite:///./{project_name}.db"
         secret_key: str = "your-secret-key"
         debug: bool = True
 
