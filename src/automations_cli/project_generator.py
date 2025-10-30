@@ -476,8 +476,6 @@ Examples:
     if args.fullstack:
         # Import and run the fullstack generator
         try:
-            import sys
-            import os
             # Add the current directory to path to import the fullstack module
             sys.path.append(os.path.dirname(__file__))
             import fullstack
