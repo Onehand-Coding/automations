@@ -66,8 +66,15 @@ def open_in_sublime(project_path):
         sublime_project = os.path.join(
             project_path, ".sublime-workspace", f"{project_name}.sublime-project"
         )
-        subprocess.run(["subl", "--project", sublime_project], check=True)
-        logger.info("Opened project in Sublime Text")
+        # Check if the sublime project file exists before trying to open
+        if os.path.exists(sublime_project):
+            subprocess.run(["subl", "--project", sublime_project], check=True)
+            logger.info("Opened project in Sublime Text")
+        else:
+            logger.error(f"Sublime project file not found: {sublime_project}")
+            # As fallback, just open the directory in sublime
+            subprocess.run(["subl", project_path], check=True)
+            logger.info("Opened project directory in Sublime Text as fallback")
     except subprocess.CalledProcessError as e:
         logger.error(f"Failed to open Sublime Text: {e}")
     except FileNotFoundError:
@@ -508,8 +515,8 @@ Examples:
             logger.error(f"Failed to import fullstack module: {e}")
             sys.exit(1)
     else:
-        project_path = Path(args.path or DEFAULT_PROJECTS_DIR).expanduser()
-        project_path.mkdir(exist_ok=True)
+        project_path = Path(args.path or DEFAULT_PROJECTS_DIR).expanduser().resolve()
+        project_path.mkdir(parents=True, exist_ok=True)
 
         full_project_path = project_path / project_name
         if full_project_path.exists():
