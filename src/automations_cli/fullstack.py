@@ -11,8 +11,8 @@ import textwrap
 def create_file(filepath: Path, content: str):
     """Create a file with the given content, creating parent directories if needed."""
     filepath.parent.mkdir(parents=True, exist_ok=True)
-    filepath.write_text(textwrap.dedent(content).strip() + "\n")
-    print(f"✓ Created: {filepath}")
+    filepath.write_text(textwrap.dedent(content).strip() + "\n", encoding='utf-8')
+    print(f"[OK] Created: {filepath}")
 
 
 def create_backend(root: Path, project_name: str):
@@ -699,28 +699,28 @@ def main(project_name: str = "my-fullstack-app"):
     root = Path.cwd()
 
     if (root / 'backend').exists() or (root / 'frontend').exists():
-        print(f"\n⚠️  Backend or frontend directory already exists in current location. Overwrite? Skipping creation.")
+        print(f"\n[WARN] Backend or frontend directory already exists in current location. Overwrite? Skipping creation.")
         return
 
-    print(f"\n📁 Creating fullstack project: {project_name}")
+    print(f"\n[INFO] Creating fullstack project: {project_name}")
     
     # Create backend and frontend
-    print("\n🔧 Generating backend structure...")
+    print("\n[BACKEND] Generating backend structure...")
     create_backend(root, project_name)
 
-    print("\n⚛️  Generating frontend structure...")
+    print("\n[FRONTEND] Generating frontend structure...")
     create_frontend(root)
 
-    print("\n📝 Creating README and .gitignore...")
+    print("\n[DOCS] Creating README and .gitignore...")
     create_readme(root, project_name)
     create_gitignore(root)
 
     # Print success message
     print("\n" + "=" * 60)
-    print("✅ Project created successfully!")
+    print("[SUCCESS] Project created successfully!")
     print("=" * 60)
-    print(f"\n📂 Project location: {root.absolute()}")
-    print("\n🚀 Next steps:")
+    print(f"\n[LOCATION] Project location: {root.absolute()}")
+    print("\n[GUIDE] Next steps:")
     print(f"\n1. Backend setup:")
     print(f"   cd backend")
     print(f"   uv sync")
@@ -730,7 +730,7 @@ def main(project_name: str = "my-fullstack-app"):
     print(f"   npm install")
     print(f"   npm run dev")
     print(f"\n3. Open http://localhost:5173 in your browser")
-    print(f"\n📖 Check README.md for more details")
+    print(f"\n[INFO] Check README.md for more details")
     print("\n" + "=" * 60)
 
 
