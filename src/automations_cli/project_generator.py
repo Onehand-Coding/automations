@@ -62,9 +62,11 @@ def prompt_if_missing(value, prompt, default=None, choices=None):
 def open_in_sublime(project_path):
     """Open the project in Sublime Text."""
     try:
-        project_name = os.path.basename(project_path)
+        # Get absolute path to determine the project name correctly
+        abs_project_path = os.path.abspath(project_path)
+        project_name = os.path.basename(abs_project_path)
         sublime_project = os.path.join(
-            project_path, ".sublime-workspace", f"{project_name}.sublime-project"
+            abs_project_path, ".sublime-workspace", f"{project_name}.sublime-project"
         )
         # Check if the sublime project file exists before trying to open
         if os.path.exists(sublime_project):
@@ -486,7 +488,7 @@ Examples:
             # Add the current directory to path to import the fullstack module
             sys.path.append(os.path.dirname(__file__))
             import fullstack
-            full_project_path = Path(args.path or DEFAULT_PROJECTS_DIR).expanduser() / project_name
+            full_project_path = (Path(args.path or DEFAULT_PROJECTS_DIR).expanduser() / project_name).resolve()
             full_project_path.mkdir(parents=True, exist_ok=True)
             os.chdir(full_project_path)
             fullstack.main(project_name)
