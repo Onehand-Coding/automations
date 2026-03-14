@@ -313,9 +313,15 @@ if __name__ == "__main__":
 
 
 def create_frontend(root: Path):
-    """Create the React frontend with Vite."""
+    """Create the React frontend with Vite, TypeScript, Tailwind CSS, and shadcn/ui."""
     frontend = root / "frontend"
     src = frontend / "src"
+    
+    # Create directory structure
+    (src / "components" / "ui").mkdir(parents=True, exist_ok=True)
+    (src / "lib").mkdir(parents=True, exist_ok=True)
+    (src / "integrations").mkdir(parents=True, exist_ok=True)
+    (frontend / "public").mkdir(parents=True, exist_ok=True)
 
     # package.json
     create_file(frontend / "package.json", """
@@ -326,40 +332,255 @@ def create_frontend(root: Path):
       "type": "module",
       "scripts": {
         "dev": "vite",
-        "build": "vite build",
+        "build": "tsc -b && vite build",
+        "lint": "eslint .",
         "preview": "vite preview"
       },
       "dependencies": {
-        "react": "^18.2.0",
-        "react-dom": "^18.2.0",
-        "axios": "^1.6.0"
+        "react": "^18.3.1",
+        "react-dom": "^18.3.1",
+        "axios": "^1.7.0",
+        "clsx": "^2.1.1",
+        "tailwind-merge": "^2.3.0",
+        "class-variance-authority": "^0.7.0",
+        "lucide-react": "^0.395.0",
+        "@radix-ui/react-slot": "^1.0.2",
+        "tailwindcss-animate": "^1.0.7"
       },
       "devDependencies": {
-        "@types/react": "^18.2.0",
-        "@types/react-dom": "^18.2.0",
-        "@vitejs/plugin-react": "^4.2.0",
-        "vite": "^5.0.0"
+        "@types/node": "^20.14.0",
+        "@types/react": "^18.3.3",
+        "@types/react-dom": "^18.3.0",
+        "@typescript-eslint/eslint-plugin": "^7.13.0",
+        "@typescript-eslint/parser": "^7.13.0",
+        "@vitejs/plugin-react-swc": "^3.7.0",
+        "autoprefixer": "^10.4.19",
+        "eslint": "^8.57.0",
+        "eslint-plugin-react-hooks": "^4.6.2",
+        "eslint-plugin-react-refresh": "^0.4.7",
+        "postcss": "^8.4.38",
+        "tailwindcss": "^3.4.4",
+        "typescript": "^5.4.5",
+        "vite": "^5.3.1"
       }
     }
     """)
 
-    # vite.config.js
-    create_file(frontend / "vite.config.js", """
-    import { defineConfig } from 'vite'
-    import react from '@vitejs/plugin-react'
+    # vite.config.ts
+    create_file(frontend / "vite.config.ts", """
+    import { defineConfig } from "vite";
+    import react from "@vitejs/plugin-react-swc";
+    import path from "path";
 
     export default defineConfig({
       plugins: [react()],
       server: {
         port: 5173,
         proxy: {
-          '/api': {
-            target: 'http://localhost:8000',
+          "/api": {
+            target: "http://localhost:8000",
             changeOrigin: true,
-          }
+          },
+        },
+      },
+      resolve: {
+        alias: {
+          "@": path.resolve(__dirname, "./src"),
+        },
+      },
+    });
+    """)
+
+    # tsconfig.json
+    create_file(frontend / "tsconfig.json", """
+    {
+      "files": [],
+      "references": [
+        { "path": "./tsconfig.app.json" },
+        { "path": "./tsconfig.node.json" }
+      ],
+      "compilerOptions": {
+        "baseUrl": ".",
+        "paths": {
+          "@/*": ["./src/*"]
         }
       }
-    })
+    }
+    """)
+
+    # tsconfig.app.json
+    create_file(frontend / "tsconfig.app.json", """
+    {
+      "compilerOptions": {
+        "composite": true,
+        "target": "ES2020",
+        "useDefineForClassFields": true,
+        "lib": ["ES2020", "DOM", "DOM.Iterable"],
+        "module": "ESNext",
+        "skipLibCheck": true,
+        "moduleResolution": "bundler",
+        "allowImportingTsExtensions": true,
+        "resolveJsonModule": true,
+        "isolatedModules": true,
+        "noEmit": true,
+        "jsx": "react-jsx",
+        "strict": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
+        "noFallthroughCasesInSwitch": true,
+        "baseUrl": ".",
+        "paths": {
+          "@/*": ["./src/*"]
+        }
+      },
+      "include": ["src"]
+    }
+    """)
+
+    # tsconfig.node.json
+    create_file(frontend / "tsconfig.node.json", """
+    {
+      "compilerOptions": {
+        "composite": true,
+        "target": "ES2022",
+        "lib": ["ES2023"],
+        "module": "ESNext",
+        "skipLibCheck": true,
+        "moduleResolution": "bundler",
+        "allowImportingTsExtensions": true,
+        "resolveJsonModule": true,
+        "isolatedModules": true,
+        "noEmit": true,
+        "strict": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
+        "noFallthroughCasesInSwitch": true
+      },
+      "include": ["vite.config.ts"]
+    }
+    """)
+
+    # vite-env.d.ts
+    create_file(frontend / "vite-env.d.ts", """
+    /// <reference types="vite/client" />
+    """)
+
+    # tailwind.config.ts
+    create_file(frontend / "tailwind.config.ts", """
+    import type { Config } from "tailwindcss";
+
+    const config: Config = {
+      darkMode: ["class"],
+      content: [
+        "./pages/**/*.{ts,tsx}",
+        "./components/**/*.{ts,tsx}",
+        "./app/**/*.{ts,tsx}",
+        "./src/**/*.{ts,tsx}",
+      ],
+      prefix: "",
+      theme: {
+        container: {
+          center: true,
+          padding: "2rem",
+          screens: {
+            "2xl": "1400px",
+          },
+        },
+        extend: {
+          colors: {
+            border: "hsl(var(--border))",
+            input: "hsl(var(--input))",
+            ring: "hsl(var(--ring))",
+            background: "hsl(var(--background))",
+            foreground: "hsl(var(--foreground))",
+            primary: {
+              DEFAULT: "hsl(var(--primary))",
+              foreground: "hsl(var(--primary-foreground))",
+            },
+            secondary: {
+              DEFAULT: "hsl(var(--secondary))",
+              foreground: "hsl(var(--secondary-foreground))",
+            },
+            destructive: {
+              DEFAULT: "hsl(var(--destructive))",
+              foreground: "hsl(var(--destructive-foreground))",
+            },
+            muted: {
+              DEFAULT: "hsl(var(--muted))",
+              foreground: "hsl(var(--muted-foreground))",
+            },
+            accent: {
+              DEFAULT: "hsl(var(--accent))",
+              foreground: "hsl(var(--accent-foreground))",
+            },
+            popover: {
+              DEFAULT: "hsl(var(--popover))",
+              foreground: "hsl(var(--popover-foreground))",
+            },
+            card: {
+              DEFAULT: "hsl(var(--card))",
+              foreground: "hsl(var(--card-foreground))",
+            },
+          },
+          borderRadius: {
+            lg: "var(--radius)",
+            md: "calc(var(--radius) - 2px)",
+            sm: "calc(var(--radius) - 4px)",
+          },
+          keyframes: {
+            "accordion-down": {
+              from: { height: "0" },
+              to: { height: "var(--radix-accordion-content-height)" },
+            },
+            "accordion-up": {
+              from: { height: "var(--radix-accordion-content-height)" },
+              to: { height: "0" },
+            },
+          },
+          animation: {
+            "accordion-down": "accordion-down 0.2s ease-out",
+            "accordion-up": "accordion-up 0.2s ease-out",
+          },
+        },
+      },
+      plugins: [require("tailwindcss-animate")],
+    };
+
+    export default config;
+    """)
+
+    # postcss.config.js
+    create_file(frontend / "postcss.config.js", """
+    export default {
+      plugins: {
+        tailwindcss: {},
+        autoprefixer: {},
+      },
+    };
+    """)
+
+    # components.json (shadcn/ui)
+    create_file(frontend / "components.json", """
+    {
+      "$schema": "https://ui.shadcn.com/schema.json",
+      "style": "default",
+      "rsc": false,
+      "tsx": true,
+      "tailwind": {
+        "config": "tailwind.config.ts",
+        "css": "src/index.css",
+        "baseColor": "slate",
+        "cssVariables": true,
+        "prefix": ""
+      },
+      "aliases": {
+        "components": "@/components",
+        "utils": "@/lib/utils",
+        "ui": "@/components/ui",
+        "lib": "@/lib",
+        "hooks": "@/hooks"
+      }
+    }
     """)
 
     # index.html
@@ -373,142 +594,343 @@ def create_frontend(root: Path):
       </head>
       <body>
         <div id="root"></div>
-        <script type="module" src="/src/main.jsx"></script>
+        <script type="module" src="/src/main.tsx"></script>
       </body>
     </html>
     """)
 
-    # src/main.jsx
-    create_file(src / "main.jsx", """
-    import React from 'react'
-    import ReactDOM from 'react-dom/client'
-    import App from './App'
-    import './index.css'
+    # src/index.css (with Tailwind and shadcn/ui CSS variables)
+    create_file(src / "index.css", """
+    @tailwind base;
+    @tailwind components;
+    @tailwind utilities;
 
-    ReactDOM.createRoot(document.getElementById('root')).render(
-      <React.StrictMode>
-        <App />
-      </React.StrictMode>,
-    )
+    @layer base {
+      :root {
+        --background: 0 0% 100%;
+        --foreground: 222.2 84% 4.9%;
+        --card: 0 0% 100%;
+        --card-foreground: 222.2 84% 4.9%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 222.2 84% 4.9%;
+        --primary: 222.2 47.4% 11.2%;
+        --primary-foreground: 210 40% 98%;
+        --secondary: 210 40% 96.1%;
+        --secondary-foreground: 222.2 47.4% 11.2%;
+        --muted: 210 40% 96.1%;
+        --muted-foreground: 215.4 16.3% 46.9%;
+        --accent: 210 40% 96.1%;
+        --accent-foreground: 222.2 47.4% 11.2%;
+        --destructive: 0 84.2% 60.2%;
+        --destructive-foreground: 210 40% 98%;
+        --border: 214.3 31.8% 91.4%;
+        --input: 214.3 31.8% 91.4%;
+        --ring: 222.2 84% 4.9%;
+        --radius: 0.5rem;
+      }
+
+      .dark {
+        --background: 222.2 84% 4.9%;
+        --foreground: 210 40% 98%;
+        --card: 222.2 84% 4.9%;
+        --card-foreground: 210 40% 98%;
+        --popover: 222.2 84% 4.9%;
+        --popover-foreground: 210 40% 98%;
+        --primary: 210 40% 98%;
+        --primary-foreground: 222.2 47.4% 11.2%;
+        --secondary: 217.2 32.6% 17.5%;
+        --secondary-foreground: 210 40% 98%;
+        --muted: 217.2 32.6% 17.5%;
+        --muted-foreground: 215 20.2% 65.1%;
+        --accent: 217.2 32.6% 17.5%;
+        --accent-foreground: 210 40% 98%;
+        --destructive: 0 62.8% 30.6%;
+        --destructive-foreground: 210 40% 98%;
+        --border: 217.2 32.6% 17.5%;
+        --input: 217.2 32.6% 17.5%;
+        --ring: 212.7 26.8% 83.9%;
+      }
+    }
+
+    @layer base {
+      * {
+        @apply border-border;
+      }
+      body {
+        @apply bg-background text-foreground;
+      }
+    }
     """)
 
-    # src/App.jsx
-    create_file(src / "App.jsx", """
-    import { useState, useEffect } from 'react'
-    import axios from 'axios'
+    # src/main.tsx
+    create_file(src / "main.tsx", """
+    import { StrictMode } from "react";
+    import { createRoot } from "react-dom/client";
+    import App from "./App";
+    import "./index.css";
+
+    createRoot(document.getElementById("root")!).render(
+      <StrictMode>
+        <App />
+      </StrictMode>
+    );
+    """)
+
+    # src/lib/utils.ts (shadcn/ui utility)
+    create_file(src / "lib" / "utils.ts", """
+    import { type ClassValue, clsx } from "clsx";
+    import { twMerge } from "tailwind-merge";
+
+    export function cn(...inputs: ClassValue[]) {
+      return twMerge(clsx(inputs));
+    }
+    """)
+
+    # src/integrations/api.ts (Type-safe API client)
+    create_file(src / "integrations" / "api.ts", """
+    import axios from "axios";
+
+    export const api = axios.create({
+      baseURL: "/api",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    export interface HealthResponse {
+      status: string;
+      timestamp: string;
+      service: string;
+    }
+
+    export const healthApi = {
+      check: () => api.get<HealthResponse>("/health"),
+    };
+    """)
+
+    # src/components/ui/button.tsx (shadcn/ui Button component)
+    create_file(src / "components" / "ui" / "button.tsx", """
+    import * as React from "react";
+    import { Slot } from "@radix-ui/react-slot";
+    import { cva, type VariantProps } from "class-variance-authority";
+    import { cn } from "@/lib/utils";
+
+    const buttonVariants = cva(
+      "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+      {
+        variants: {
+          variant: {
+            default: "bg-primary text-primary-foreground hover:bg-primary/90",
+            destructive:
+              "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+            outline:
+              "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+            secondary:
+              "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+            ghost: "hover:bg-accent hover:text-accent-foreground",
+            link: "text-primary underline-offset-4 hover:underline",
+          },
+          size: {
+            default: "h-10 px-4 py-2",
+            sm: "h-9 rounded-md px-3",
+            lg: "h-11 rounded-md px-8",
+            icon: "h-10 w-10",
+          },
+        },
+        defaultVariants: {
+          variant: "default",
+          size: "default",
+        },
+      }
+    );
+
+    export interface ButtonProps
+      extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+        VariantProps<typeof buttonVariants> {
+      asChild?: boolean;
+    }
+
+    const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+      ({ className, variant, size, asChild = false, ...props }, ref) => {
+        const Comp = asChild ? Slot : "button";
+        return (
+          <Comp
+            className={cn(buttonVariants({ variant, size, className }))}
+            ref={ref}
+            {...props}
+          />
+        );
+      }
+    );
+    Button.displayName = "Button";
+
+    export { Button, buttonVariants };
+    """)
+
+    # src/components/ui/card.tsx (shadcn/ui Card component)
+    create_file(src / "components" / "ui" / "card.tsx", """
+    import * as React from "react";
+    import { cn } from "@/lib/utils";
+
+    const Card = React.forwardRef<
+      HTMLDivElement,
+      React.HTMLAttributes<HTMLDivElement>
+    >(({ className, ...props }, ref) => (
+      <div
+        ref={ref}
+        className={cn(
+          "rounded-lg border bg-card text-card-foreground shadow-sm",
+          className
+        )}
+        {...props}
+      />
+    ));
+    Card.displayName = "Card";
+
+    const CardHeader = React.forwardRef<
+      HTMLDivElement,
+      React.HTMLAttributes<HTMLDivElement>
+    >(({ className, ...props }, ref) => (
+      <div
+        ref={ref}
+        className={cn("flex flex-col space-y-1.5 p-6", className)}
+        {...props}
+      />
+    ));
+    CardHeader.displayName = "CardHeader";
+
+    const CardTitle = React.forwardRef<
+      HTMLParagraphElement,
+      React.HTMLAttributes<HTMLHeadingElement>
+    >(({ className, ...props }, ref) => (
+      <h3
+        ref={ref}
+        className={cn(
+          "text-2xl font-semibold leading-none tracking-tight",
+          className
+        )}
+        {...props}
+      />
+    ));
+    CardTitle.displayName = "CardTitle";
+
+    const CardDescription = React.forwardRef<
+      HTMLParagraphElement,
+      React.HTMLAttributes<HTMLParagraphElement>
+    >(({ className, ...props }, ref) => (
+      <p
+        ref={ref}
+        className={cn("text-sm text-muted-foreground", className)}
+        {...props}
+      />
+    ));
+    CardDescription.displayName = "CardDescription";
+
+    const CardContent = React.forwardRef<
+      HTMLDivElement,
+      React.HTMLAttributes<HTMLDivElement>
+    >(({ className, ...props }, ref) => (
+      <div ref={ref} className={cn("p-6 pt-0", className)} {...props} />
+    ));
+    CardContent.displayName = "CardContent";
+
+    const CardFooter = React.forwardRef<
+      HTMLDivElement,
+      React.HTMLAttributes<HTMLDivElement>
+    >(({ className, ...props }, ref) => (
+      <div
+        ref={ref}
+        className={cn("flex items-center p-6 pt-0", className)}
+        {...props}
+      />
+    ));
+    CardFooter.displayName = "CardFooter";
+
+    export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent };
+    """)
+
+    # src/App.tsx
+    create_file(src / "App.tsx", """
+    import { useState, useEffect } from "react";
+    import { healthApi, type HealthResponse } from "@/integrations/api";
+    import { Button } from "@/components/ui/button";
+    import {
+      Card,
+      CardContent,
+      CardDescription,
+      CardFooter,
+      CardHeader,
+      CardTitle,
+    } from "@/components/ui/card";
 
     function App() {
-      const [health, setHealth] = useState(null)
-      const [loading, setLoading] = useState(true)
-      const [error, setError] = useState(null)
+      const [health, setHealth] = useState<HealthResponse | null>(null);
+      const [loading, setLoading] = useState(true);
+      const [error, setError] = useState<string | null>(null);
 
       useEffect(() => {
         const checkHealth = async () => {
           try {
-            const response = await axios.get('/api/health')
-            setHealth(response.data)
-            setLoading(false)
+            const response = await healthApi.check();
+            setHealth(response.data);
+            setLoading(false);
           } catch (err) {
-            setError(err.message)
-            setLoading(false)
+            setError(err instanceof Error ? err.message : "An error occurred");
+            setLoading(false);
           }
-        }
+        };
 
-        checkHealth()
-      }, [])
+        checkHealth();
+      }, []);
 
       return (
-        <div className="container">
-          <h1>FastAPI + React</h1>
-          <div className="card">
-            <h2>Backend Health Check</h2>
-            {loading && <p>Loading...</p>}
-            {error && <p className="error">Error: {error}</p>}
-            {health && (
-              <div className="success">
-                <p>Status: {health.status}</p>
-                <p>Service: {health.service}</p>
-                <p>Timestamp: {health.timestamp}</p>
-              </div>
-            )}
+        <div className="min-h-screen bg-background">
+          <div className="container mx-auto py-10">
+            <Card className="max-w-2xl mx-auto">
+              <CardHeader>
+                <CardTitle>FastAPI + React</CardTitle>
+                <CardDescription>
+                  Full-stack application with FastAPI backend and React frontend
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <h2 className="text-lg font-semibold mb-4">Backend Health Check</h2>
+                {loading && <p className="text-muted-foreground">Loading...</p>}
+                {error && (
+                  <p className="text-destructive">Error: {error}</p>
+                )}
+                {health && (
+                  <div className="space-y-2">
+                    <p>
+                      <span className="font-medium">Status:</span>{" "}
+                      <span className="text-green-600">{health.status}</span>
+                    </p>
+                    <p>
+                      <span className="font-medium">Service:</span>{" "}
+                      {health.service}
+                    </p>
+                    <p>
+                      <span className="font-medium">Timestamp:</span>{" "}
+                      {new Date(health.timestamp).toLocaleString()}
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+              <CardFooter>
+                <Button onClick={() => window.location.reload()}>
+                  Refresh
+                </Button>
+              </CardFooter>
+            </Card>
           </div>
-          <p className="info">
-            Edit <code>src/App.jsx</code> and save to test HMR
-          </p>
         </div>
-      )
+      );
     }
 
-    export default App
+    export default App;
     """)
 
-    # src/index.css
-    create_file(src / "index.css", """
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-        'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-        sans-serif;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-      background: #242424;
-      color: rgba(255, 255, 255, 0.87);
-    }
-
-    .container {
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 2rem;
-      text-align: center;
-    }
-
-    h1 {
-      font-size: 3rem;
-      margin-bottom: 2rem;
-      background: linear-gradient(45deg, #646cff, #535bf2);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    .card {
-      background: #1a1a1a;
-      padding: 2rem;
-      border-radius: 8px;
-      margin: 2rem 0;
-    }
-
-    .card h2 {
-      margin-bottom: 1rem;
-    }
-
-    .success {
-      color: #4ade80;
-    }
-
-    .error {
-      color: #f87171;
-    }
-
-    .info {
-      color: #888;
-      margin-top: 2rem;
-    }
-
-    code {
-      background: #1a1a1a;
-      padding: 0.2rem 0.4rem;
-      border-radius: 4px;
-      font-family: 'Courier New', monospace;
-    }
-    """)
-
-    # Create public directory
+    # Create public directory (already created above, but keeping for consistency)
     (frontend / "public").mkdir(parents=True, exist_ok=True)
 
 
@@ -528,6 +950,7 @@ pip-wheel-metadata/
 build/
 dist/
 *.egg-info/
+*.so
 
 # Logs
 logs/
@@ -537,26 +960,33 @@ logs/
 .vscode/
 .idea/
 *.sublime-*
+*.swp
+*.swo
+*~
 
 # OS generated files
 .DS_Store
 Thumbs.db
+Desktop.ini
 
 # Testing
 .coverage
 coverage.xml
 *.cover
-
-# Virtual environments
-.venv/
+*.py,cover
+.pytest_cache/
+.tox/
 
 # Node.js
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-dist/
-build/
+.pnpm-debug.log*
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
 
 # Environment variables
 .env
@@ -575,118 +1005,266 @@ build/
 # Backend specific
 backend/.venv/
 backend/__pycache__/
+backend/dist/
+backend/build/
 
 # Frontend specific
 frontend/dist/
 frontend/.vite/
 frontend/node_modules/
+frontend/build/
+frontend/coverage/
+frontend/tsconfig.tsbuildinfo
+
+# Testing
+*.test.js.snap
 """
     create_file(root / ".gitignore", gitignore_content)
 
 
+def create_frontend_readme(root: Path):
+    """Create frontend README with setup instructions."""
+    create_file(root / "frontend" / "README.md", """
+# Frontend
+
+React + TypeScript + Vite + Tailwind CSS + shadcn/ui
+
+## Tech Stack
+
+- **React 18** - UI library
+- **TypeScript** - Type safety
+- **Vite** - Build tool and dev server
+- **Tailwind CSS** - Utility-first CSS framework
+- **shadcn/ui** - Re-usable components built with Radix UI and Tailwind CSS
+- **Axios** - HTTP client
+
+## Setup
+
+```bash
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+
+# Build for production
+npm run build
+
+# Preview production build
+npm run preview
+
+# Run linter
+npm run lint
+```
+
+## Project Structure
+
+```
+frontend/
+├── src/
+│   ├── components/
+│   │   └── ui/          # shadcn/ui components
+│   ├── integrations/    # API clients
+│   ├── lib/             # Utilities
+│   ├── App.tsx          # Main app component
+│   ├── main.tsx         # Entry point
+│   └── index.css        # Global styles
+├── index.html
+├── package.json
+├── tailwind.config.ts
+├── tsconfig.json
+└── vite.config.ts
+```
+
+## Adding Components
+
+### Using shadcn/ui
+
+This project uses shadcn/ui for components. To add new components:
+
+```bash
+# Using npx
+npx shadcn-ui@latest add button
+
+# Using pnpm
+pnpm dlx shadcn-ui@latest add button
+```
+
+Available components: https://ui.shadcn.com
+
+### Manual Components
+
+Create components in `src/components/` and export them:
+
+```tsx
+// src/components/MyComponent.tsx
+import { cn } from "@/lib/utils";
+
+export function MyComponent({ className, ...props }) {
+  return (
+    <div className={cn("...", className)} {...props} />
+  );
+}
+```
+
+## API Integration
+
+API calls are configured in `src/integrations/api.ts`:
+
+```tsx
+import { api } from "@/integrations/api";
+
+// Use the typed API client
+const response = await api.get("/endpoint");
+```
+
+## Styling
+
+Use Tailwind CSS utility classes with the `cn` helper for conditional classes:
+
+```tsx
+import { cn } from "@/lib/utils";
+
+<div className={cn("base-class", isActive && "active-class")} />
+```
+
+## Path Aliases
+
+Use `@/` alias for `src/`:
+
+```tsx
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+```
+
+## Configuration
+
+- **Vite**: `vite.config.ts` - Build and dev server config
+- **TypeScript**: `tsconfig.json` - TypeScript config
+- **Tailwind**: `tailwind.config.ts` - Theme and plugins
+- **shadcn/ui**: `components.json` - Component config
+""")
+
+
 def create_readme(root: Path, project_name: str):
     """Create README with setup instructions."""
+    # Convert project name to display format (replace hyphens with spaces, title case)
+    display_name = project_name.replace("-", " ").title()
+    
     create_file(root / "README.md", f"""
-    # {project_name}
+# {display_name}
 
-    Full-stack application with FastAPI backend and React frontend.
+Full-stack application with FastAPI backend and React frontend.
 
-    ## Project Structure
+## Documentation
 
-    ```
-    {project_name}/
-    ├── backend/          # FastAPI backend with src layout
-    │   ├── src/
-    │   │   └── app/
-    │   │       ├── core/       # Configuration and settings
-    │   │       ├── db/         # Database setup
-    │   │       ├── models/     # SQLAlchemy models
-    │   │       ├── routers/    # API endpoints
-    │   │       └── main.py     # FastAPI app
-    │   └── pyproject.toml      # Python dependencies
-    └── frontend/         # React frontend with Vite
-        ├── src/
-        └── package.json
-    ```
+- **[Frontend Guide](frontend/README.md)** - React + TypeScript + Tailwind CSS + shadcn/ui documentation
+- **[Backend Guide](backend/README.md)** - FastAPI + SQLAlchemy documentation
 
-    ## Setup Instructions
+## Quick Start
 
-    ### Backend Setup
+### 1. Start Backend
 
-    1. Navigate to backend directory:
-       ```bash
-       cd backend
-       ```
+```bash
+cd backend
+uv sync
+uv run dev
+```
 
-    2. Install dependencies with uv:
-       ```bash
-       uv sync
-       ```
+Backend runs at `http://localhost:8000`
+- API docs: `http://localhost:8000/docs`
+- Health check: `http://localhost:8000/api/health`
 
-    3. Run the development server:
-       ```bash
-       uv run dev
-       ```
+### 2. Start Frontend
 
-    The backend will be available at `http://localhost:8000`
-    - API docs: `http://localhost:8000/docs`
-    - Health check: `http://localhost:8000/api/health`
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-    ### Frontend Setup
+Frontend runs at `http://localhost:5173`
 
-    1. Navigate to frontend directory:
-       ```bash
-       cd frontend
-       ```
+## Project Structure
 
-    2. Install dependencies:
-       ```bash
-       npm install
-       ```
+```
+{project_name}/
+├── backend/           # FastAPI backend with src layout
+│   ├── src/
+│   │   └── app/
+│   │       ├── core/       # Configuration and settings
+│   │       ├── db/         # Database setup
+│   │       ├── models/     # SQLAlchemy models
+│   │       ├── routers/    # API endpoints
+│   │       └── main.py     # FastAPI app
+│   └── pyproject.toml      # Python dependencies
+└── frontend/          # React frontend with Vite, TypeScript, Tailwind
+    ├── src/
+    │   ├── components/    # React components
+    │   ├── integrations/  # API clients
+    │   └── lib/           # Utilities
+    └── package.json
+```
 
-    3. Run the development server:
-       ```bash
-       npm run dev
-       ```
+## Features
 
-    The frontend will be available at `http://localhost:5173`
+- ✅ FastAPI backend with async support
+- ✅ React 18 with TypeScript
+- ✅ Tailwind CSS for styling
+- ✅ shadcn/ui components
+- ✅ Type-safe API integration
+- ✅ Hot module replacement (HMR)
+- ✅ CORS configured for local development
 
-    ## Development
+## API Endpoints
 
-    Both servers support hot-reloading. Make changes to the code and see them reflected immediately.
+### Health
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/health` | Health check endpoint |
+| GET | `/` | Root endpoint with welcome message |
 
-    ### Adding New Endpoints
+## Development
 
-    1. Create a new router in `backend/src/app/routers/`
-    2. Import and include it in `backend/src/app/main.py`
+Both servers support hot-reloading. Make changes to the code and see them reflected immediately.
 
-    ### Adding Database Models
+### Adding New Endpoints
 
-    1. Define models in `backend/src/app/models/`
-    2. Use the base model from `models/base.py`
-    3. Create and run migrations as needed
+1. Create a new router in `backend/src/app/routers/`
+2. Import and include it in `backend/src/app/main.py`
+3. Add TypeScript types in `frontend/src/integrations/api.ts`
 
-    ## Tech Stack
+### Adding Database Models
 
-    **Backend:**
-    - FastAPI - Modern Python web framework
-    - SQLAlchemy - ORM for database operations
-    - Uvicorn - ASGI server
-    - Pydantic - Data validation
+1. Define models in `backend/src/app/models/`
+2. Create schemas in `backend/src/app/schemas/`
+3. Use the base model from `models/base.py`
 
-    **Frontend:**
-    - React - UI library
-    - Vite - Build tool and dev server
-    - Axios - HTTP client
+## Tech Stack
 
-    ## Next Steps
+**Backend:**
+- FastAPI - Modern Python web framework
+- SQLAlchemy - ORM for database operations
+- Uvicorn - ASGI server
+- Pydantic - Data validation
 
-    - [ ] Set up database migrations (Alembic)
-    - [ ] Add authentication (JWT)
-    - [ ] Configure environment variables
-    - [ ] Add testing (pytest, vitest)
-    - [ ] Set up Docker for deployment
-    """)
+**Frontend:**
+- React 18 - UI library
+- TypeScript - Type safety
+- Vite - Build tool and dev server
+- Tailwind CSS - Utility-first CSS framework
+- shadcn/ui - Re-usable components
+- Axios - HTTP client
+
+## Next Steps
+
+- [ ] Set up database migrations (Alembic)
+- [ ] Add authentication (JWT)
+- [ ] Configure environment variables for production
+- [ ] Add testing (pytest, vitest/jest)
+- [ ] Set up CI/CD pipeline
+- [ ] Configure Docker for deployment
+""")
 
 
 def main(project_name: str = "my-fullstack-app"):
@@ -703,7 +1281,7 @@ def main(project_name: str = "my-fullstack-app"):
         return
 
     print(f"\n[INFO] Creating fullstack project: {project_name}")
-    
+
     # Create backend and frontend
     print("\n[BACKEND] Generating backend structure...")
     create_backend(root, project_name)
@@ -714,6 +1292,7 @@ def main(project_name: str = "my-fullstack-app"):
     print("\n[DOCS] Creating README and .gitignore...")
     create_readme(root, project_name)
     create_gitignore(root)
+    create_frontend_readme(root)
 
     # Print success message
     print("\n" + "=" * 60)

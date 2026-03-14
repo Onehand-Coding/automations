@@ -61,7 +61,7 @@ def _run_script(script_name: str, args: list[str] = [], use_sudo: bool = False):
 
 
 # --- CLI Commands ---
-@app.command()
+@app.command(help="Generates a new project with flexible templates (app/cli/lib), interactive mode, or fullstack (FastAPI + React).")
 def generate_project(
     project_name: str = typer.Argument(
         ..., help="The name for the new project directory."
