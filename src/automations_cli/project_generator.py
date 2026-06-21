@@ -363,6 +363,11 @@ Examples:
         action="store_true",
         help="Create a fullstack project with FastAPI backend and React frontend",
     )
+    parser.add_argument(
+        "--compose",
+        action="store_true",
+        help="[Fullstack only] Generate docker-compose.yml for PostgreSQL",
+    )
     # Docs
     parser.add_argument(
         "--no-docs",
@@ -491,7 +496,7 @@ Examples:
             full_project_path = (Path(args.path or DEFAULT_PROJECTS_DIR).expanduser() / project_name).resolve()
             full_project_path.mkdir(parents=True, exist_ok=True)
             os.chdir(full_project_path)
-            fullstack.main(project_name)
+            fullstack.main(project_name, compose=args.compose)
             
             # Create Sublime Text project files for fullstack projects too
             create_sublime_project(project_name)
@@ -508,9 +513,14 @@ Examples:
             # Print next steps for fullstack
             logger.info("\nNext steps:")
             logger.info(f"1. cd {full_project_path}")
-            logger.info("2. Backend: cd backend && uv sync && uv run dev")
-            logger.info("3. Frontend (in new terminal): cd frontend && npm install && npm run dev")
-            logger.info("4. Open http://localhost:5173 in your browser")
+            if args.compose:
+                logger.info("2. ./start.sh  (starts PostgreSQL + backend + frontend)")
+            else:
+                logger.info("2. ./start.sh  (starts backend + frontend)")
+            logger.info("   Or manually:")
+            logger.info("   Backend: cd backend && uv sync && uv run dev")
+            logger.info("   Frontend: cd frontend && npm install && npm run dev")
+            logger.info("3. Open http://localhost:5173 in your browser")
             
             sys.exit(0)
         except ImportError as e:

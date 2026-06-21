@@ -4,6 +4,8 @@ FastAPI + React Project Generator
 Automates the creation of a full-stack project with FastAPI backend and React frontend.
 """
 
+import os
+import stat
 from pathlib import Path
 import textwrap
 
@@ -1018,8 +1020,160 @@ frontend/tsconfig.tsbuildinfo
 
 # Testing
 *.test.js.snap
+
+# Process ID files (from start.sh)
+*.pids
 """
     create_file(root / ".gitignore", gitignore_content)
+
+
+def create_start_script(root: Path, project_name: str):
+    """Create start.sh script for running backend + frontend (adapted from exam-ace pattern)."""
+    package_name = project_name.replace("-", "_")
+
+    create_file(root / "start.sh", f"""
+    #!/bin/bash
+    # Root start script - runs both backend and frontend
+
+    echo "🚀 Starting {project_name}..."
+
+    ROOT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
+    BACKEND_DIR="$ROOT_DIR/backend"
+    FRONTEND_DIR="$ROOT_DIR/frontend"
+
+    # ==================================
+    # Cleanup: Kill any existing processes (gracefully)
+    # ==================================
+    echo "🧹 Cleaning up existing processes..."
+
+    PID_FILE="$ROOT_DIR/.{package_name}.pids"
+    BACKEND_PID=""
+    FRONTEND_PID=""
+
+    graceful_kill() {{
+        local pid=$1
+        local name=$2
+        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+            echo "   Sending SIGTERM to $name (PID: $pid)..."
+            kill -15 "$pid" 2>/dev/null
+            for i in 1 2 3 4 5; do
+                sleep 1
+                if ! kill -0 "$pid" 2>/dev/null; then
+                    echo "   ✓ $name stopped gracefully"
+                    return 0
+                fi
+            done
+            echo "   ⚠ Force-stopping $name..."
+            kill -9 "$pid" 2>/dev/null
+        fi
+        return 0
+    }}
+
+    if [ -f "$PID_FILE" ]; then
+        source "$PID_FILE"
+        [ -n "$BACKEND_PID" ] && graceful_kill "$BACKEND_PID" "backend"
+        [ -n "$FRONTEND_PID" ] && graceful_kill "$FRONTEND_PID" "frontend"
+        rm -f "$PID_FILE"
+    fi
+
+    pkill -15 -f 'uvicorn.*{package_name}' 2>/dev/null
+    pkill -15 -f 'vite.*frontend' 2>/dev/null
+
+    sleep 1
+    echo "✅ Cleanup complete"
+    echo ""
+
+    # ==================================
+    # Start Docker services (if compose file exists)
+    # ==================================
+    if [ -f "$ROOT_DIR/docker-compose.yml" ]; then
+        echo "🐳 Starting Docker services..."
+        cd "$ROOT_DIR"
+        docker compose up -d
+        echo "✅ Docker services ready"
+        echo ""
+    fi
+
+    cleanup() {{
+        echo ""
+        echo "👋 Shutting down..."
+        kill -15 $BACKEND_PID $FRONTEND_PID 2>/dev/null
+        wait $BACKEND_PID $FRONTEND_PID 2>/dev/null
+        if [ -f "$ROOT_DIR/docker-compose.yml" ]; then
+            cd "$ROOT_DIR" && docker compose down
+        fi
+        exit 0
+    }}
+
+    trap cleanup SIGINT SIGTERM
+
+    echo "📦 Starting backend..."
+    cd "$BACKEND_DIR"
+    uv run dev &
+    BACKEND_PID=$!
+    echo "✅ Backend running on http://localhost:8000"
+    echo ""
+
+    sleep 2
+
+    echo "🎨 Starting frontend..."
+    cd "$FRONTEND_DIR"
+    npm run dev &
+    FRONTEND_PID=$!
+    echo "✅ Frontend running on http://localhost:5173"
+    echo ""
+
+    cat > "$PID_FILE" << EOF
+    BACKEND_PID=$BACKEND_PID
+    FRONTEND_PID=$FRONTEND_PID
+    EOF
+
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "  Backend:  http://localhost:8000"
+    echo "  Frontend: http://localhost:5173"
+    echo "  API Docs: http://localhost:8000/docs"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    echo "Press Ctrl+C to stop all servers"
+    echo ""
+
+    wait $BACKEND_PID $FRONTEND_PID
+    """)
+
+    # Make start.sh executable
+    start_script = root / "start.sh"
+    start_script.chmod(start_script.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    print(f"[OK] Made executable: {start_script}")
+
+
+def create_docker_compose(root: Path, project_name: str):
+    """Create docker-compose.yml for PostgreSQL."""
+    db_name = project_name.replace("-", "_")
+
+    create_file(root / "docker-compose.yml", f"""
+    services:
+      db:
+        image: postgres:16-alpine
+        container_name: {project_name}-db
+        restart: unless-stopped
+        environment:
+          POSTGRES_DB: {db_name}
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - "5432:5432"
+        volumes:
+          - postgres_data:/var/lib/postgresql/data
+        healthcheck:
+          test: ["CMD-SHELL", "pg_isready -U postgres"]
+          interval: 5s
+          timeout: 5s
+          retries: 5
+
+    volumes:
+      postgres_data:
+        name: {project_name}-postgres-data
+    """)
 
 
 def create_frontend_readme(root: Path):
@@ -1267,7 +1421,7 @@ Both servers support hot-reloading. Make changes to the code and see them reflec
 """)
 
 
-def main(project_name: str = "my-fullstack-app"):
+def main(project_name: str = "my-fullstack-app", compose: bool = False):
     """Main function to orchestrate project creation."""
     print("=" * 60)
     print("FastAPI + React Project Generator")
@@ -1294,21 +1448,41 @@ def main(project_name: str = "my-fullstack-app"):
     create_gitignore(root)
     create_frontend_readme(root)
 
+    if compose:
+        print("\n[COMPOSE] Creating docker-compose.yml...")
+        create_docker_compose(root, project_name)
+        # Update .env with PostgreSQL URL instead of SQLite
+        db_name = project_name.replace("-", "_")
+        env_path = root / "backend" / ".env"
+        env_path.write_text(f"""DATABASE_URL=postgresql://postgres:postgres@localhost:5432/{db_name}
+SECRET_KEY=your-secret-key-change-in-production
+DEBUG=True
+""")
+
+    print("\n[SCRIPT] Creating start.sh...")
+    create_start_script(root, project_name)
+
     # Print success message
     print("\n" + "=" * 60)
     print("[SUCCESS] Project created successfully!")
     print("=" * 60)
     print(f"\n[LOCATION] Project location: {root.absolute()}")
     print("\n[GUIDE] Next steps:")
-    print(f"\n1. Backend setup:")
-    print(f"   cd backend")
-    print(f"   uv sync")
-    print(f"   uv run dev")
-    print(f"\n2. Frontend setup (in a new terminal):")
-    print(f"   cd frontend")
-    print(f"   npm install")
-    print(f"   npm run dev")
-    print(f"\n3. Open http://localhost:5173 in your browser")
+    print(f"\n  ./start.sh")
+    if compose:
+        print(f"     Starts PostgreSQL (Docker) + backend + frontend")
+    else:
+        print(f"     Starts backend + frontend")
+    print(f"\n  Or manually:")
+    print(f"\n  1. Backend setup:")
+    print(f"     cd backend")
+    print(f"     uv sync")
+    print(f"     uv run dev")
+    print(f"\n  2. Frontend setup (in a new terminal):")
+    print(f"     cd frontend")
+    print(f"     npm install")
+    print(f"     npm run dev")
+    print(f"\n  3. Open http://localhost:5173 in your browser")
     print(f"\n[INFO] Check README.md for more details")
     print("\n" + "=" * 60)
 
@@ -1317,6 +1491,7 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Create a fullstack FastAPI + React project")
     parser.add_argument("project_name", nargs="?", default="my-fullstack-app", help="Name of the project")
+    parser.add_argument("--compose", action="store_true", help="Generate docker-compose.yml for PostgreSQL")
     
     args = parser.parse_args()
-    main(args.project_name)
+    main(args.project_name, compose=args.compose)

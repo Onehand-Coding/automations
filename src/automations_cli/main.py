@@ -75,6 +75,9 @@ def generate_project(
     fullstack: bool = typer.Option(
         False, "--fullstack", help="Create a fullstack project with FastAPI backend and React frontend"
     ),
+    compose: bool = typer.Option(
+        False, "--compose", help="[Fullstack only] Generate docker-compose.yml for PostgreSQL"
+    ),
     no_docs: bool = typer.Option(
         False,
         "--no-docs",
@@ -116,6 +119,8 @@ def generate_project(
         args.extend(["--type", type])
     if fullstack:
         args.append("--fullstack")
+    if compose:
+        args.append("--compose")
     if no_docs:
         args.append("--no-docs")
     if description:
