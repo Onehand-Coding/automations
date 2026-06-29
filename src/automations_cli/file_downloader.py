@@ -280,41 +280,45 @@ def download_files(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Download files from URLs using aria2c, wget, or curl."
-    )
-    parser.add_argument("urls", nargs="+", help="One or more URLs to download.")
-    parser.add_argument(
-        "--output-name", "-n", help="Optional output filename (for single file only)."
-    )
-    parser.add_argument(
-        "--output-dir",
-        "-o",
-        help="Directory to save the file(s) (default: ~/Downloads).",
-    )
-    parser.add_argument(
-        "--method",
-        "-m",
-        choices=["auto", "aria2", "wget", "curl"],
-        default="auto",
-        help="Download method: auto, aria2, wget, curl (default: auto).",
-    )
-    parser.add_argument(
-        "--no-resume",
-        action="store_true",
-        help="Disable resume functionality (default: resume enabled).",
-    )
-    parser.add_argument(
-        "--quiet", "-q", action="store_true", help="Suppress output (quiet mode)."
-    )
+    try:
+        parser = argparse.ArgumentParser(
+            description="Download files from URLs using aria2c, wget, or curl."
+        )
+        parser.add_argument("urls", nargs="+", help="One or more URLs to download.")
+        parser.add_argument(
+            "--output-name", "-n", help="Optional output filename (for single file only)."
+        )
+        parser.add_argument(
+            "--output-dir",
+            "-o",
+            help="Directory to save the file(s) (default: ~/Downloads).",
+        )
+        parser.add_argument(
+            "--method",
+            "-m",
+            choices=["auto", "aria2", "wget", "curl"],
+            default="auto",
+            help="Download method: auto, aria2, wget, curl (default: auto).",
+        )
+        parser.add_argument(
+            "--no-resume",
+            action="store_true",
+            help="Disable resume functionality (default: resume enabled).",
+        )
+        parser.add_argument(
+            "--quiet", "-q", action="store_true", help="Suppress output (quiet mode)."
+        )
 
-    args = parser.parse_args()
+        args = parser.parse_args()
 
-    download_files(
-        urls=args.urls,
-        output_name=args.output_name,
-        output_dir=args.output_dir,
-        method=args.method,
-        resume=not args.no_resume,
-        quiet=args.quiet,
-    )
+        download_files(
+            urls=args.urls,
+            output_name=args.output_name,
+            output_dir=args.output_dir,
+            method=args.method,
+            resume=not args.no_resume,
+            quiet=args.quiet,
+        )
+    except KeyboardInterrupt:
+        print("\nCancelled.")
+        sys.exit(130)

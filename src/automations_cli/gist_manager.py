@@ -364,103 +364,107 @@ def download_gist(token: str, gist_id_or_url: str, output_dir: str = None):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Manage GitHub Gists.")
-    subparsers = parser.add_subparsers(dest="action", required=True)
+    try:
+        parser = argparse.ArgumentParser(description="Manage GitHub Gists.")
+        subparsers = parser.add_subparsers(dest="action", required=True)
 
-    # Upload subcommand
-    upload_parser = subparsers.add_parser("upload", help="Upload files as a new gist.")
-    upload_parser.add_argument(
-        "file_paths", nargs="+", help="Paths to the files to upload as a gist."
-    )
-    upload_parser.add_argument(
-        "--description", "-d", default="", help="Description for the gist."
-    )
-    upload_parser.add_argument(
-        "--public", action="store_true", help="Create a public gist (default: secret)."
-    )
-    upload_parser.add_argument(
-        "--non-interactive",
-        action="store_true",
-        help="Skip prompting and create new gist.",
-    )
-
-    # Update subcommand
-    update_parser = subparsers.add_parser(
-        "update", help="Update an existing gist by filename or ID."
-    )
-    update_parser.add_argument(
-        "file_paths",
-        nargs="*",
-        help="Paths to the files to update (optional for description-only updates).",
-    )
-    update_parser.add_argument(
-        "--update",
-        required=True,
-        help="Filename or gist ID to identify the gist to update.",
-    )
-    update_parser.add_argument(
-        "--description",
-        "-d",
-        default="",
-        help="New description for the gist (uses existing if not provided).",
-    )
-
-    # List subcommand
-    subparsers.add_parser("list", help="List existing gists.")
-
-    # Delete subcommand
-    delete_parser = subparsers.add_parser(
-        "delete", help="Delete a gist by filename or ID."
-    )
-    delete_parser.add_argument(
-        "gist_identifier",
-        help="Gist ID or filename to identify the gist to delete.",
-    )
-
-    # Download subcommand
-    download_parser = subparsers.add_parser(
-        "download", help="Download a gist by ID or URL."
-    )
-    download_parser.add_argument(
-        "gist_id_or_url", help="Gist ID or full gist URL to download."
-    )
-    download_parser.add_argument(
-        "--output-dir",
-        default=None,
-        help="Directory to save the gist files (default: ./gist-<id>).",
-    )
-
-    args = parser.parse_args()
-
-    # Load environment variables
-    load_dotenv()
-    token = os.getenv("GITHUB_TOKEN")
-    if not token:
-        token_path = Path.home() / ".gist"
-        if token_path.exists():
-            with token_path.open("r", encoding="utf-8") as f:
-                token = f.read().strip()
-        else:
-            errmsg = "❌ GITHUB_TOKEN not found in .env or ~/.gist file."
-            logger.error(errmsg)
-            print(errmsg, file=sys.stderr)
-            sys.exit(1)
-
-    if args.action == "upload":
-        upload_gist(
-            [Path(p) for p in args.file_paths],
-            args.description,
-            args.public,
-            token,
-            args.non_interactive,
+        # Upload subcommand
+        upload_parser = subparsers.add_parser("upload", help="Upload files as a new gist.")
+        upload_parser.add_argument(
+            "file_paths", nargs="+", help="Paths to the files to upload as a gist."
         )
-    elif args.action == "update":
-        update_gist(
-            [Path(p) for p in args.file_paths], args.update, args.description, token
+        upload_parser.add_argument(
+            "--description", "-d", default="", help="Description for the gist."
         )
-    elif args.action == "list":
-        list_gists(token)
-    elif args.action == "delete":
-        delete_gist(token, args.gist_identifier)
-    elif args.action == "download":
-        download_gist(token, args.gist_id_or_url, args.output_dir)
+        upload_parser.add_argument(
+            "--public", action="store_true", help="Create a public gist (default: secret)."
+        )
+        upload_parser.add_argument(
+            "--non-interactive",
+            action="store_true",
+            help="Skip prompting and create new gist.",
+        )
+
+        # Update subcommand
+        update_parser = subparsers.add_parser(
+            "update", help="Update an existing gist by filename or ID."
+        )
+        update_parser.add_argument(
+            "file_paths",
+            nargs="*",
+            help="Paths to the files to update (optional for description-only updates).",
+        )
+        update_parser.add_argument(
+            "--update",
+            required=True,
+            help="Filename or gist ID to identify the gist to update.",
+        )
+        update_parser.add_argument(
+            "--description",
+            "-d",
+            default="",
+            help="New description for the gist (uses existing if not provided).",
+        )
+
+        # List subcommand
+        subparsers.add_parser("list", help="List existing gists.")
+
+        # Delete subcommand
+        delete_parser = subparsers.add_parser(
+            "delete", help="Delete a gist by filename or ID."
+        )
+        delete_parser.add_argument(
+            "gist_identifier",
+            help="Gist ID or filename to identify the gist to delete.",
+        )
+
+        # Download subcommand
+        download_parser = subparsers.add_parser(
+            "download", help="Download a gist by ID or URL."
+        )
+        download_parser.add_argument(
+            "gist_id_or_url", help="Gist ID or full gist URL to download."
+        )
+        download_parser.add_argument(
+            "--output-dir",
+            default=None,
+            help="Directory to save the gist files (default: ./gist-<id>).",
+        )
+
+        args = parser.parse_args()
+
+        # Load environment variables
+        load_dotenv()
+        token = os.getenv("GITHUB_TOKEN")
+        if not token:
+            token_path = Path.home() / ".gist"
+            if token_path.exists():
+                with token_path.open("r", encoding="utf-8") as f:
+                    token = f.read().strip()
+            else:
+                errmsg = "❌ GITHUB_TOKEN not found in .env or ~/.gist file."
+                logger.error(errmsg)
+                print(errmsg, file=sys.stderr)
+                sys.exit(1)
+
+        if args.action == "upload":
+            upload_gist(
+                [Path(p) for p in args.file_paths],
+                args.description,
+                args.public,
+                token,
+                args.non_interactive,
+            )
+        elif args.action == "update":
+            update_gist(
+                [Path(p) for p in args.file_paths], args.update, args.description, token
+            )
+        elif args.action == "list":
+            list_gists(token)
+        elif args.action == "delete":
+            delete_gist(token, args.gist_identifier)
+        elif args.action == "download":
+            download_gist(token, args.gist_id_or_url, args.output_dir)
+    except KeyboardInterrupt:
+        print("\nCancelled.")
+        sys.exit(130)

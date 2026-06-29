@@ -175,62 +175,66 @@ def embed_subtitle(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Subtitle management tool.")
-    subparsers = parser.add_subparsers(dest="action", required=True)
+    try:
+        parser = argparse.ArgumentParser(description="Subtitle management tool.")
+        subparsers = parser.add_subparsers(dest="action", required=True)
 
-    # --- Sync command ---
-    sync_parser = subparsers.add_parser(
-        "sync", help="Automatically sync a subtitle file with a video."
-    )
-    sync_parser.add_argument("video_path", help="Path to the video file.")
-    sync_parser.add_argument(
-        "input_srt", help="Path to the original (unsynced) .srt file."
-    )
-    sync_parser.add_argument("output_srt", help="Path for the new, synced .srt file.")
-
-    # --- Shift command ---
-    shift_parser = subparsers.add_parser(
-        "shift", help="Create a new, time-shifted subtitle file."
-    )
-    shift_parser.add_argument("input_srt", help="Path to the original .srt file.")
-    shift_parser.add_argument("output_srt", help="Path for the new, shifted .srt file.")
-    shift_parser.add_argument(
-        "--offset",
-        type=float,
-        required=True,
-        help="Time offset in seconds (e.g., -13.0).",
-    )
-
-    # --- Embed command ---
-    embed_parser = subparsers.add_parser("embed", help="Embed subtitles into a video.")
-    embed_parser.add_argument("video_path", help="Path to the input video file.")
-    embed_parser.add_argument("subtitle_path", help="Path to the .srt subtitle file.")
-    embed_parser.add_argument("output_path", help="Path for the new output video file.")
-    embed_parser.add_argument(
-        "--offset",
-        type=float,
-        default=0.0,
-        help="Softsub synchronization offset in seconds.",
-    )
-    embed_parser.add_argument(
-        "--hard",
-        action="store_true",
-        help="Burn subtitles permanently into the video (re-encodes).",
-    )
-
-    args = parser.parse_args()
-
-    if args.action == "sync":
-        sync_subtitle(
-            Path(args.video_path), Path(args.input_srt), Path(args.output_srt)
+        # --- Sync command ---
+        sync_parser = subparsers.add_parser(
+            "sync", help="Automatically sync a subtitle file with a video."
         )
-    elif args.action == "shift":
-        shift_subtitle(Path(args.input_srt), Path(args.output_srt), args.offset)
-    elif args.action == "embed":
-        embed_subtitle(
-            Path(args.video_path),
-            Path(args.subtitle_path),
-            Path(args.output_path),
-            args.offset,
-            args.hard,
+        sync_parser.add_argument("video_path", help="Path to the video file.")
+        sync_parser.add_argument(
+            "input_srt", help="Path to the original (unsynced) .srt file."
         )
+        sync_parser.add_argument("output_srt", help="Path for the new, synced .srt file.")
+
+        # --- Shift command ---
+        shift_parser = subparsers.add_parser(
+            "shift", help="Create a new, time-shifted subtitle file."
+        )
+        shift_parser.add_argument("input_srt", help="Path to the original .srt file.")
+        shift_parser.add_argument("output_srt", help="Path for the new, shifted .srt file.")
+        shift_parser.add_argument(
+            "--offset",
+            type=float,
+            required=True,
+            help="Time offset in seconds (e.g., -13.0).",
+        )
+
+        # --- Embed command ---
+        embed_parser = subparsers.add_parser("embed", help="Embed subtitles into a video.")
+        embed_parser.add_argument("video_path", help="Path to the input video file.")
+        embed_parser.add_argument("subtitle_path", help="Path to the .srt subtitle file.")
+        embed_parser.add_argument("output_path", help="Path for the new output video file.")
+        embed_parser.add_argument(
+            "--offset",
+            type=float,
+            default=0.0,
+            help="Softsub synchronization offset in seconds.",
+        )
+        embed_parser.add_argument(
+            "--hard",
+            action="store_true",
+            help="Burn subtitles permanently into the video (re-encodes).",
+        )
+
+        args = parser.parse_args()
+
+        if args.action == "sync":
+            sync_subtitle(
+                Path(args.video_path), Path(args.input_srt), Path(args.output_srt)
+            )
+        elif args.action == "shift":
+            shift_subtitle(Path(args.input_srt), Path(args.output_srt), args.offset)
+        elif args.action == "embed":
+            embed_subtitle(
+                Path(args.video_path),
+                Path(args.subtitle_path),
+                Path(args.output_path),
+                args.offset,
+                args.hard,
+            )
+    except KeyboardInterrupt:
+        print("\nCancelled.")
+        sys.exit(130)

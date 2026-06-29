@@ -57,7 +57,10 @@ def _run_script(script_name: str, args: list[str] = [], use_sudo: bool = False):
 
     # typer.echo(f"▶️  Running: {' '.join(command)}")  # This is noise
     # We use .call here instead of .run to allow the script to be interactive (e.g., for password prompts)
-    subprocess.call(command)
+    try:
+        subprocess.call(command)
+    except KeyboardInterrupt:
+        raise typer.Exit(130)
 
 
 # --- CLI Commands ---
@@ -70,46 +73,49 @@ def generate_project(
         None, "--path", "-p", help="Path to create project (default: ~/Coding/projects)"
     ),
     type: str = typer.Option(
-        "lib", "--type", help="Project type: app, cli, or lib (default: lib)"
+        "lib", "--type", "-t", help="Project type: app, cli, or lib (default: lib)"
     ),
     fullstack: bool = typer.Option(
-        False, "--fullstack", help="Create a fullstack project with FastAPI backend and React frontend"
+        False, "--fullstack", "-f", help="Create a fullstack project with FastAPI backend and React frontend"
     ),
     compose: bool = typer.Option(
-        False, "--compose", help="[Fullstack only] Generate docker-compose.yml for PostgreSQL"
+        False, "--compose", "-c", help="[Fullstack only] Generate docker-compose.yml for PostgreSQL"
     ),
     no_docs: bool = typer.Option(
         False,
         "--no-docs",
+        "-D",
         help="Do not generate documentation files (README.md, LICENSE, pyproject.toml, .gitignore). Project will not be buildable with uv/hatchling until you add the required files.",
     ),
     description: str = typer.Option(
         "Add your description here",
         "--description",
+        "-d",
         help="Project description for README and pyproject.toml",
     ),
     author: str = typer.Option(
-        "Onehand-Coding", "--author", help="Author name for LICENSE and pyproject.toml"
+        "Onehand-Coding", "--author", "-a", help="Author name for LICENSE and pyproject.toml"
     ),
     email: str = typer.Option(
-        "onehand.coding433@gmail.com", "--email", help="Author email for pyproject.toml"
+        "onehand.coding433@gmail.com", "--email", "-e", help="Author email for pyproject.toml"
     ),
     license_type: str = typer.Option(
         "MIT",
         "--license-type",
+        "-l",
         help="License type for documentation files (MIT, Apache-2.0, GPL-3.0)",
     ),
     no_venv: bool = typer.Option(
-        False, "--no-venv", help="Skip virtual environment creation"
+        False, "--no-venv", "-V", help="Skip virtual environment creation"
     ),
     no_git: bool = typer.Option(
-        False, "--no-git", help="Skip Git repository initialization"
+        False, "--no-git", "-g", help="Skip Git repository initialization"
     ),
     open: bool = typer.Option(
         False, "--open", "-o", help="Open in Sublime Text after creation"
     ),
     interactive: bool = typer.Option(
-        False, "--interactive", help="Prompt interactively for all project options."
+        False, "--interactive", "-i", help="Prompt interactively for all project options."
     ),
 ):
     args = [project_name]

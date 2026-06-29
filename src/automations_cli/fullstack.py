@@ -5,6 +5,7 @@ Automates the creation of a full-stack project with FastAPI backend and React fr
 """
 
 import os
+import sys
 import stat
 from pathlib import Path
 import textwrap
@@ -1488,10 +1489,14 @@ DEBUG=True
 
 
 if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser(description="Create a fullstack FastAPI + React project")
-    parser.add_argument("project_name", nargs="?", default="my-fullstack-app", help="Name of the project")
-    parser.add_argument("--compose", action="store_true", help="Generate docker-compose.yml for PostgreSQL")
-    
-    args = parser.parse_args()
-    main(args.project_name, compose=args.compose)
+    try:
+        import argparse
+        parser = argparse.ArgumentParser(description="Create a fullstack FastAPI + React project")
+        parser.add_argument("project_name", nargs="?", default="my-fullstack-app", help="Name of the project")
+        parser.add_argument("--compose", action="store_true", help="Generate docker-compose.yml for PostgreSQL")
+        
+        args = parser.parse_args()
+        main(args.project_name, compose=args.compose)
+    except KeyboardInterrupt:
+        print("\nCancelled.")
+        sys.exit(130)

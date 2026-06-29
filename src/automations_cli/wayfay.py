@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import re
+import sys
 import platform
 import subprocess
 from pathlib import Path
@@ -196,4 +197,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\nCancelled.")
+        sys.exit(130)

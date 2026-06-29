@@ -47,7 +47,11 @@ def prompt_if_missing(value, prompt, default=None, choices=None):
         prompt_str += f" [{default}]"
     prompt_str += ": "
     while True:
-        answer = input(prompt_str).strip()
+        try:
+            answer = input(prompt_str).strip()
+        except (KeyboardInterrupt, EOFError):
+            print("\nCancelled.")
+            sys.exit(130)
         if not answer and default is not None:
             return default
         if choices and answer and answer not in choices:
@@ -226,13 +230,22 @@ def create_gitignore():
     logger.info("Created .gitignore.")
 
 
-def create_sublime_project(project_name):
+def create_sublime_project(project_name, is_fullstack=False):
     """Create Sublime Text project files with settings."""
     workspace_dir = Path(".sublime-workspace")
     workspace_dir.mkdir(exist_ok=True)
 
     project_file = workspace_dir / f"{project_name}.sublime-project"
     project_path_abs = Path.cwd().as_posix()  # Use POSIX paths for consistency
+
+    if is_fullstack:
+        venv_path = f"{project_path_abs}/backend/.venv"
+        venv_bin = f"{project_path_abs}/backend/.venv/bin/python"
+        venv_dir = f"{project_path_abs}/backend"
+    else:
+        venv_path = f"{project_path_abs}/.venv"
+        venv_bin = f"{project_path_abs}/.venv/bin/python"
+        venv_dir = f"{project_path_abs}"
 
     project_content = f'''{{
     "folders": [
@@ -245,8 +258,8 @@ def create_sublime_project(project_name):
             "LSP-pyright": {{
                 "settings": {{
                     "python": {{
-                        "pythonPath": "{project_path_abs}/.venv/bin/python",
-                        "venvPath": "{project_path_abs}",
+                        "pythonPath": "{venv_bin}",
+                        "venvPath": "{venv_dir}",
                         "venv": ".venv"
                     }}
                 }}
@@ -261,7 +274,7 @@ def create_sublime_project(project_name):
             "title": "{project_name}",
             "auto_close": false,
             "focus": true,
-            "shell_cmd": "{project_path_abs}/.venv/bin/python -u \\"$file\\"",
+            "shell_cmd": "{venv_bin} -u \\"$file\\"",
             "file_regex": "^[ ]*File \\"(...*?)\\", line ([0-9]*)",
             "working_dir": "${{file_path}}",
             "selector": "source.python",
@@ -499,7 +512,7 @@ Examples:
             fullstack.main(project_name, compose=args.compose)
             
             # Create Sublime Text project files for fullstack projects too
-            create_sublime_project(project_name)
+            create_sublime_project(project_name, is_fullstack=True)
             
             # Initialize Git repository for fullstack projects too
             init_git_repo(args.no_git)
@@ -612,4 +625,8 @@ Examples:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\nCancelled.")
+        sys.exit(130)

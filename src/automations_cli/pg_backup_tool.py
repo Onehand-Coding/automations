@@ -827,6 +827,9 @@ def main():
 if __name__ == "__main__":
     try:
         main()
+    except KeyboardInterrupt:
+        print("\nCancelled.")
+        sys.exit(130)
     except Exception as e:
         # Log the exception with traceback before exiting
         logger.exception("An unhandled exception occurred in main execution.")

@@ -358,90 +358,94 @@ def is_playlist_url(url: str) -> bool:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Enhanced yt-dlp video downloader wrapper."
-    )
-    parser.add_argument("url", nargs="?", help="The URL of the video to download.")
-    parser.add_argument(
-        "output_name", nargs="?", default=None, help="Optional output filename."
-    )
-    parser.add_argument(
-        "--quality",
-        default="best",
-        help="Desired video quality (e.g., 720p, 1080p, best).",
-    )
-    parser.add_argument(
-        "--list-formats",
-        action="store_true",
-        help="List available formats for the URL.",
-    )
-    parser.add_argument(
-        "--playlist-mode",
-        default="download_all",
-        choices=[
-            "download_all",
-            "single",
-            "first_n",
-            "download_all_video",
-            "items_video",
-            "audio_only",
-            "download_all_audio",
-            "items_audio",
-        ],
-        help="How to handle playlists.",
-    )
-    parser.add_argument(
-        "--items",
-        type=str,
-        default=None,
-        help="Download specific items from a playlist.",
-    )
-    parser.add_argument(
-        "--create-config",
-        action="store_true",
-        help="Create a default configuration file.",
-    )
-    parser.add_argument(
-        "--no-config", action="store_true", help="Don't use configuration file."
-    )
-    parser.add_argument(
-        "--browser",
-        type=str,
-        default=None,
-        help="Browser to use for cookies (e.g., 'brave').",
-    )
-    parser.add_argument(
-        "--archive", type=str, default=None, help="Path to download archive file."
-    )
+    try:
+        parser = argparse.ArgumentParser(
+            description="Enhanced yt-dlp video downloader wrapper."
+        )
+        parser.add_argument("url", nargs="?", help="The URL of the video to download.")
+        parser.add_argument(
+            "output_name", nargs="?", default=None, help="Optional output filename."
+        )
+        parser.add_argument(
+            "--quality",
+            default="best",
+            help="Desired video quality (e.g., 720p, 1080p, best).",
+        )
+        parser.add_argument(
+            "--list-formats",
+            action="store_true",
+            help="List available formats for the URL.",
+        )
+        parser.add_argument(
+            "--playlist-mode",
+            default="download_all",
+            choices=[
+                "download_all",
+                "single",
+                "first_n",
+                "download_all_video",
+                "items_video",
+                "audio_only",
+                "download_all_audio",
+                "items_audio",
+            ],
+            help="How to handle playlists.",
+        )
+        parser.add_argument(
+            "--items",
+            type=str,
+            default=None,
+            help="Download specific items from a playlist.",
+        )
+        parser.add_argument(
+            "--create-config",
+            action="store_true",
+            help="Create a default configuration file.",
+        )
+        parser.add_argument(
+            "--no-config", action="store_true", help="Don't use configuration file."
+        )
+        parser.add_argument(
+            "--browser",
+            type=str,
+            default=None,
+            help="Browser to use for cookies (e.g., 'brave').",
+        )
+        parser.add_argument(
+            "--archive", type=str, default=None, help="Path to download archive file."
+        )
 
-    args = parser.parse_args()
+        args = parser.parse_args()
 
-    # Handle special commands
-    if args.create_config:
-        create_default_config()
-        sys.exit(0)
+        # Handle special commands
+        if args.create_config:
+            create_default_config()
+            sys.exit(0)
 
-    if args.list_formats:
+        if args.list_formats:
+            if not args.url:
+                print("❌ URL is required when using --list-formats", file=sys.stderr)
+                sys.exit(1)
+            success = list_formats(args.url)
+            sys.exit(0 if success else 1)
+
+        # Validate that URL is provided for download
         if not args.url:
-            print("❌ URL is required when using --list-formats", file=sys.stderr)
+            print("❌ URL is required for download", file=sys.stderr)
+            parser.print_help()
             sys.exit(1)
-        success = list_formats(args.url)
-        sys.exit(0 if success else 1)
 
-    # Validate that URL is provided for download
-    if not args.url:
-        print("❌ URL is required for download", file=sys.stderr)
-        parser.print_help()
-        sys.exit(1)
-
-    # Perform download
-    download(
-        url=args.url,
-        output_name=args.output_name,
-        quality=args.quality,
-        playlist_mode=args.playlist_mode,
-        playlist_items=args.items,
-        use_config=not args.no_config,
-        browser=args.browser,
-        archive=args.archive,
-    )
+        # Perform download
+        download(
+            url=args.url,
+            output_name=args.output_name,
+            quality=args.quality,
+            playlist_mode=args.playlist_mode,
+            playlist_items=args.items,
+            use_config=not args.no_config,
+            browser=args.browser,
+            archive=args.archive,
+        )
+    except KeyboardInterrupt:
+        print("\nCancelled.")
+        sys.exit(130)
