@@ -78,8 +78,11 @@ def generate_project(
     fullstack: bool = typer.Option(
         False, "--fullstack", "-f", help="Create a fullstack project with FastAPI backend and React frontend"
     ),
+    flutter: bool = typer.Option(
+        False, "--flutter", "-F", help="Create a Flutter project with FastAPI backend"
+    ),
     compose: bool = typer.Option(
-        False, "--compose", "-c", help="[Fullstack only] Generate docker-compose.yml for PostgreSQL"
+        False, "--compose", "-c", help="[Fullstack/Flutter only] Generate docker-compose.yml for PostgreSQL"
     ),
     no_docs: bool = typer.Option(
         False,
@@ -125,6 +128,8 @@ def generate_project(
         args.extend(["--type", type])
     if fullstack:
         args.append("--fullstack")
+    if flutter:
+        args.append("--flutter")
     if compose:
         args.append("--compose")
     if no_docs:

@@ -230,7 +230,7 @@ def create_gitignore():
     logger.info("Created .gitignore.")
 
 
-def create_sublime_project(project_name, is_fullstack=False):
+def create_sublime_project(project_name, backend_in_subdir=False):
     """Create Sublime Text project files with settings."""
     workspace_dir = Path(".sublime-workspace")
     workspace_dir.mkdir(exist_ok=True)
@@ -238,7 +238,7 @@ def create_sublime_project(project_name, is_fullstack=False):
     project_file = workspace_dir / f"{project_name}.sublime-project"
     project_path_abs = Path.cwd().as_posix()  # Use POSIX paths for consistency
 
-    if is_fullstack:
+    if backend_in_subdir:
         venv_path = f"{project_path_abs}/backend/.venv"
         venv_bin = f"{project_path_abs}/backend/.venv/bin/python"
         venv_dir = f"{project_path_abs}/backend"
@@ -347,11 +347,17 @@ Project Types:
   --type cli        CLI tool with entry point
   --type lib        Standard library/SDK (default)
 
+Flavors:
+  --fullstack    FastAPI backend + React frontend
+  --flutter      FastAPI backend + Flutter frontend
+
 Examples:
   %(prog)s my-app --type app
   %(prog)s my-cli --type cli --author "Jane Doe"
   %(prog)s my-lib --type lib --description "My library"
   %(prog)s quick-test --type app --no-venv --no-git --no-docs
+  %(prog)s my-fullstack --fullstack
+  %(prog)s my-flutter --flutter --compose
   %(prog)s --interactive
 """,
     )
@@ -370,16 +376,22 @@ Examples:
         default=None,
         help="Project type: app, cli, or lib (default: lib)",
     )
-    # Fullstack option
+    # Flavor options
     parser.add_argument(
         "--fullstack",
         action="store_true",
         help="Create a fullstack project with FastAPI backend and React frontend",
     )
     parser.add_argument(
+        "--flutter",
+        "-F",
+        action="store_true",
+        help="Create a Flutter project with FastAPI backend",
+    )
+    parser.add_argument(
         "--compose",
         action="store_true",
-        help="[Fullstack only] Generate docker-compose.yml for PostgreSQL",
+        help="[Fullstack/Flutter only] Generate docker-compose.yml for PostgreSQL",
     )
     # Docs
     parser.add_argument(
@@ -499,7 +511,7 @@ Examples:
         logger.error("Project name cannot be empty.")
         sys.exit(1)
 
-    # Check if the fullstack option is selected
+    # Check if a flavor option is selected
     if args.fullstack:
         # Import and run the fullstack generator
         try:
@@ -512,7 +524,7 @@ Examples:
             fullstack.main(project_name, compose=args.compose)
             
             # Create Sublime Text project files for fullstack projects too
-            create_sublime_project(project_name, is_fullstack=True)
+            create_sublime_project(project_name, backend_in_subdir=True)
             
             # Initialize Git repository for fullstack projects too
             init_git_repo(args.no_git)
@@ -538,6 +550,39 @@ Examples:
             sys.exit(0)
         except ImportError as e:
             logger.error(f"Failed to import fullstack module: {e}")
+            sys.exit(1)
+    elif args.flutter:
+        # Import and run the flutter generator
+        try:
+            sys.path.append(os.path.dirname(__file__))
+            import flutter
+            full_project_path = (Path(args.path or DEFAULT_PROJECTS_DIR).expanduser() / project_name).resolve()
+            full_project_path.mkdir(parents=True, exist_ok=True)
+            os.chdir(full_project_path)
+            flutter.main(project_name, compose=args.compose)
+            
+            create_sublime_project(project_name, backend_in_subdir=True)
+            init_git_repo(args.no_git)
+            
+            if args.open:
+                open_in_sublime(str(full_project_path))
+            
+            logger.info(f"Flutter project '{project_name}' created successfully at {full_project_path}")
+            
+            logger.info("\nNext steps:")
+            logger.info(f"1. cd {full_project_path}")
+            if args.compose:
+                logger.info("2. ./start.sh  (starts PostgreSQL + backend + frontend)")
+            else:
+                logger.info("2. ./start.sh  (starts backend + frontend)")
+            logger.info("   Or manually:")
+            logger.info("   Backend: cd backend && uv sync && uv run dev")
+            logger.info("   Frontend: cd frontend && flutter pub get && flutter run")
+            logger.info("3. Open http://localhost:8000/docs for API docs")
+            
+            sys.exit(0)
+        except ImportError as e:
+            logger.error(f"Failed to import flutter module: {e}")
             sys.exit(1)
     else:
         project_path = Path(args.path or DEFAULT_PROJECTS_DIR).expanduser().resolve()
