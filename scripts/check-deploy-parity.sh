@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# Audit LAN-deployment repos against the devops standard.
+#
+#   ./scripts/check-deploy-parity.sh ~/Coding/projects/{resident-hub,pwdims,aics-tracking-system}
+#
+# Every check encodes a failure that actually happened in production, not a
+# style preference. Exits non-zero if any repo has a gap, so it can run from
+# CI or a pre-push hook. See docs/local-deploy-standard.md for the why.
+set -uo pipefail
+
+[ $# -ge 1 ] || { echo "usage: $0 <repo-dir> [repo-dir...]" >&2; exit 2; }
+
+FAILURES=0
+NAMES=()
+for r in "$@"; do NAMES+=("$(basename "$r")"); done
+
+# name | file (relative) | grep -E pattern | expect present(1) or absent(0)
+#   | optional guard: rule only applies if this pattern is in the compose file
+#
+# The guard keeps the checker honest. The root-owned-bind-mount rules are
+# meaningless in a project whose compose never bind-mounts ./backups, and a
+# checker that reports a gap there teaches people to ignore it.
+CHECKS=(
+  "env_get reads .env.prod|prod|env_get\(\) \{|1"
+  "no stale '. .env' sourcing|prod|^[^#]*\. \"\\\$REPO_DIR/\.env\"|0"
+  "up: mkdir+chown ./backups|prod|chown \"\\\$\(id -u\):\\\$\(id -g\)\"|1|- \./backups:"
+  "up: exports HOST_UID/GID|prod|export HOST_UID|1|- \./backups:"
+  "backup: umask 077|prod|umask 077|1"
+  "backup: encrypts at rest|prod|sql\.gz\.enc|1"
+  "backup: retention from env|prod|env_get BACKUP_RETENTION_DAYS|1"
+  "restore: verify before DROP|prod|Verifying backup before|1"
+  "env example: passphrase key|.env.prod.example|^BACKUP_ENCRYPTION_PASSPHRASE=|1"
+  "env example: says .env.prod|.env.prod.example|[Cc]opy to \.env \(|0"
+  "sidecar dumps encrypted|scripts/pg_backup.sh|BACKUP_ENCRYPTION_PASSPHRASE|1"
+  "sidecar umask 077|scripts/pg_backup.sh|umask 077|1"
+  "sidecar healthcheck glob .enc|docker-compose.prod.yml|auto-\*\.sql\.gz' |0"
+)
+
+printf '%-32s' "check"
+for n in "${NAMES[@]}"; do printf '%-22s' "$n"; done
+echo
+printf '%.0s-' $(seq $((32 + 22 * $#))); echo
+
+for c in "${CHECKS[@]}"; do
+  IFS='|' read -r label file pattern expect guard <<< "$c"
+  printf '%-32s' "$label"
+  for r in "$@"; do
+    if [ ! -e "$r/$file" ]; then
+      printf '%-22s' "n/a"
+      continue
+    fi
+    # -- so a pattern starting with '-' isn't parsed as grep options; without
+    # it those checks silently reported n/a on repos that do apply.
+    if [ -n "${guard:-}" ] && ! grep -qE -- "$guard" "$r/docker-compose.prod.yml" 2>/dev/null; then
+      printf '%-22s' "n/a"
+      continue
+    fi
+    if grep -qE -- "$pattern" "$r/$file" 2>/dev/null; then found=1; else found=0; fi
+    if [ "$found" = "$expect" ]; then
+      printf '%-22s' "ok"
+    else
+      printf '%-22s' "GAP"
+      FAILURES=$((FAILURES + 1))
+    fi
+  done
+  echo
+done
+
+echo
+if [ "$FAILURES" -eq 0 ]; then
+  echo "All repos match the standard."
+else
+  echo "$FAILURES gap(s) found — see docs/local-deploy-standard.md"
+fi
+exit $(( FAILURES > 0 ))

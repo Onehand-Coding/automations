@@ -313,25 +313,44 @@ case "$1" in
         $COMPOSE ps
         ;;
     backup)
+        # Encrypted at rest. A dump on an office-LAN box is the whole
+        # database in one readable file; umask 077 keeps it off other
+        # accounts, openssl keeps it unreadable if the file itself walks.
+        export BACKUP_ENCRYPTION_PASSPHRASE="$(env_get BACKUP_ENCRYPTION_PASSPHRASE)"
+        : "${BACKUP_ENCRYPTION_PASSPHRASE:?set BACKUP_ENCRYPTION_PASSPHRASE in .env.prod}"
+
         BACKUP_DIR="$REPO_DIR/backups"
-        TIMESTAMP=$(date +%F_%H%M%S)
-        RETENTION_DAYS=30
+        TIMESTAMP=$(date -u +%Y%m%dT%H%M%SZ)
+        RETENTION_DAYS="$(env_get BACKUP_RETENTION_DAYS)"
+        RETENTION_DAYS="${RETENTION_DAYS:-30}"
+
+        umask 077
         mkdir -p "$BACKUP_DIR"
 
-        DB_FILE="$BACKUP_DIR/__PACKAGE__-manual-${TIMESTAMP}.sql.gz"
+        DB_FILE="$BACKUP_DIR/__PACKAGE__-manual-${TIMESTAMP}.sql.gz.enc"
         $COMPOSE up -d --wait db
-        $COMPOSE exec -T db pg_dump -U postgres __PACKAGE__ | gzip > "$DB_FILE"
+        $COMPOSE exec -T db pg_dump -U postgres __PACKAGE__ \\
+          | gzip \\
+          | openssl enc -aes-256-cbc -pbkdf2 -salt -pass env:BACKUP_ENCRYPTION_PASSPHRASE > "$DB_FILE"
+        if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+            echo "Backup failed: pg_dump did not complete (is the db container running?)" >&2
+            rm -f "$DB_FILE"
+            exit 1
+        fi
         echo "Database backup: $DB_FILE ($(du -h "$DB_FILE" | cut -f1))"
 
-        find "$BACKUP_DIR" -name '__PACKAGE__-manual-*.sql.gz' -mtime "+${RETENTION_DAYS}" -delete
+        find "$BACKUP_DIR" -name '__PACKAGE__-manual-*.sql.gz.enc' -mtime "+${RETENTION_DAYS}" -delete
         echo "Backup complete."
         ;;
     restore)
+        export BACKUP_ENCRYPTION_PASSPHRASE="$(env_get BACKUP_ENCRYPTION_PASSPHRASE)"
+        : "${BACKUP_ENCRYPTION_PASSPHRASE:?set BACKUP_ENCRYPTION_PASSPHRASE in .env.prod}"
+
         BACKUP_DIR="$REPO_DIR/backups"
         if [ -n "${2:-}" ]; then
             BACKUP_FILE="$2"
         else
-            BACKUP_FILE=$(ls -t "$BACKUP_DIR"/__PACKAGE__-manual-*.sql.gz 2>/dev/null | head -1)
+            BACKUP_FILE=$(ls -t "$BACKUP_DIR"/__PACKAGE__-manual-*.sql.gz.enc 2>/dev/null | head -1)
         fi
 
         if [ -z "$BACKUP_FILE" ] || [ ! -f "$BACKUP_FILE" ]; then
@@ -343,10 +362,26 @@ case "$1" in
         read -r -p "Type the project name to confirm: " confirm
         [ "$confirm" = "__PROJECT__" ] || { echo "Aborted."; exit 1; }
 
+        DB_TMP=$(mktemp /tmp/__PACKAGE__-restore-XXXXXX.sql)
+        trap 'rm -f "$DB_TMP"' EXIT
+
+        echo "Verifying backup before touching the live database..."
+        # The live DB is dropped below — never get there with an unreadable
+        # backup. Decrypt + decompress to a temp file first: a wrong
+        # passphrase or corrupt archive fails here, while the DB is intact.
+        openssl enc -d -aes-256-cbc -pbkdf2 -pass env:BACKUP_ENCRYPTION_PASSPHRASE \\
+            -in "$BACKUP_FILE" | gunzip -c > "$DB_TMP"
+
+        if [ ! -s "$DB_TMP" ] || ! head -n 5 "$DB_TMP" | grep -q "PostgreSQL database dump"; then
+            echo "ERROR: Backup does not look like a valid PostgreSQL dump (wrong passphrase or corrupt file). Aborting — nothing was changed." >&2
+            exit 1
+        fi
+
+        echo "Backup verified. Recreating __PACKAGE__..."
         $COMPOSE up -d --wait db
         $COMPOSE exec -T db psql -U postgres -d postgres -c "DROP DATABASE IF EXISTS __PACKAGE__;"
         $COMPOSE exec -T db psql -U postgres -d postgres -c "CREATE DATABASE __PACKAGE__ OWNER postgres;"
-        gunzip -c "$BACKUP_FILE" | $COMPOSE exec -T db psql -U postgres -d __PACKAGE__
+        $COMPOSE exec -T db psql -U postgres -d __PACKAGE__ < "$DB_TMP"
         echo "Restore complete."
         ;;
     offsite-sync)
@@ -439,6 +474,16 @@ ENV_PROD_EXAMPLE = """
 
 POSTGRES_PASSWORD=
 SECRET_KEY=
+
+# Passphrase for at-rest encryption of `./prod backup` dumps
+# (openssl aes-256-cbc). Required — backup and restore both refuse to run
+# without it. Generate with: openssl rand -base64 36
+# LOSING THIS MEANS LOSING EVERY BACKUP: an encrypted dump cannot be
+# recovered without it, so keep a copy somewhere durable off this machine.
+BACKUP_ENCRYPTION_PASSPHRASE=
+
+# Retention for `./prod backup` dumps, in days.
+BACKUP_RETENTION_DAYS=30
 
 # Optional: rsync target for `./prod offsite-sync`, e.g. user@host:/backups/
 OFFSITE_TARGET=
