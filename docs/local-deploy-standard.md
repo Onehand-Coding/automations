@@ -123,21 +123,30 @@ sed -n 's/^BACKUP_ENCRYPTION_PASSPHRASE=//p' .env.prod | head -1
 Three passphrases living only on the machine whose disk failure they exist
 to survive is not a backup strategy. They need a durable copy off that box.
 
+**One dependency scan per tree, and it covers dev dependencies too.** This
+applies to `pip-audit` exactly as it does to `npm audit`. Both live in the
+`security` job, which syncs with dev deps (`uv sync --frozen`, no
+`--no-dev`); no second scan anywhere else. Deleting the duplicate was not
+enough on its own here — the two Python scans had *different scope*, and the
+one in the `backend` job was the wider of the pair, so the surviving scan had
+to drop `--no-dev` before the duplicate could go. A duplicate gate is worth
+removing; silently narrowing coverage while removing it is worse than the
+duplicate was.
+
 ## Known remaining divergences
 
-- `aics-tracking-system` splits config across `.env.prod` and
-  `backend/.env.prod`; the other two use one file. The backup sidecar no
-  longer reads the backend file, but the backend still does.
+- The three apps inject backend config three different ways, and the
+  difference is a security one, not a style one. `pwdims` maps keys
+  explicitly under `environment:` — each container sees only its own
+  secrets. `resident-hub` uses `env_file: .env.prod`, so the whole file,
+  `BACKUP_ENCRYPTION_PASSPHRASE` included, is present in the web-facing
+  backend container. `aics-tracking-system` splits config across `.env.prod`
+  and `backend/.env.prod` and points `env_file` at the latter. Consolidating
+  aics onto one file would match `resident-hub` while giving its backend the
+  backup passphrase and the Grafana admin password — a regression. `pwdims`
+  is the target shape for all three; converting the other two needs the full
+  key list from each live (gitignored) `.env.prod`, since a key present
+  there but absent from `.env.prod.example` would break the app the moment
+  `env_file` stops catching it.
 - `aics-tracking-system` has no Redis, worker, or RS256 JWT keys; those
   rules apply only where the service exists.
-- `pwdims` gates `backend`/`frontend` behind `needs: security`, so a red
-  security job skips them entirely rather than running them; the other two
-  do not gate. While security was red this hid a known-failing
-  forced-password-change test. Not yet reconciled.
-- `pip-audit` still runs twice in `pwdims` and `aics` (`uvx pip-audit
-  --local` in `backend`, `uv pip install pip-audit && pip-audit
-  --skip-editable` in `security`) where `resident-hub` runs it once. Same
-  duplicate-gate shape the npm rule above fixes, not yet applied to Python.
-- The checker reports `n/a`, not `GAP`, when a file is missing entirely, so
-  a rule cannot catch a repo that simply lacks the file. Fine for genuinely
-  optional files, a hole for required ones.

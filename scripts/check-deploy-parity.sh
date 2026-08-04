@@ -41,6 +41,13 @@ CHECKS=(
   "npm gate: wired into CI|.github/workflows/ci.yml|check-audit\.cjs|1"
   "npm gate: no blunt threshold|.github/workflows/ci.yml|npm audit --audit-level|0"
   "npm gate: dev deps in scope|.github/workflows/ci.yml|npm audit.*--omit=dev|0"
+  # Same rule for the Python tree. The second copy lived in the `backend` job as
+  # `uvx pip-audit --local` and was the only one syncing dev deps, so deleting
+  # it as a "duplicate" would have narrowed coverage instead of unifying it —
+  # the surviving scan had to widen first.
+  "pip gate: wired into CI|.github/workflows/ci.yml|uv run pip-audit|1"
+  "pip gate: one scan, not two|.github/workflows/ci.yml|uvx pip-audit|0"
+  "pip gate: dev deps in scope|.github/workflows/ci.yml|uv sync --frozen --no-dev|0"
 )
 
 printf '%-32s' "check"
@@ -52,14 +59,22 @@ for c in "${CHECKS[@]}"; do
   IFS='|' read -r label file pattern expect guard <<< "$c"
   printf '%-32s' "$label"
   for r in "$@"; do
-    if [ ! -e "$r/$file" ]; then
-      printf '%-22s' "n/a"
-      continue
-    fi
+    # Guard first, then existence. Whether a rule *applies* is the guard's job;
+    # once it applies, a missing file is a gap, not an exemption. Checking
+    # existence first would report a guarded-out rule as a false GAP.
+    #
     # -- so a pattern starting with '-' isn't parsed as grep options; without
     # it those checks silently reported n/a on repos that do apply.
     if [ -n "${guard:-}" ] && ! grep -qE -- "$guard" "$r/docker-compose.prod.yml" 2>/dev/null; then
       printf '%-22s' "n/a"
+      continue
+    fi
+    # A missing file used to print n/a, which meant no rule could catch a repo
+    # that simply deleted the thing being audited — the strictest possible
+    # gate and the total absence of one scored identically.
+    if [ ! -e "$r/$file" ]; then
+      printf '%-22s' "GAP (no file)"
+      FAILURES=$((FAILURES + 1))
       continue
     fi
     if grep -qE -- "$pattern" "$r/$file" 2>/dev/null; then found=1; else found=0; fi
