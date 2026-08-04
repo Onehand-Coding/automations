@@ -72,6 +72,42 @@ CSRF allowlist, matched on exact netloc. `/auth/login` has no CSRF check
 but `/auth/refresh` does, so a missing `:7443` lets people log in and then
 bounces them at the first refresh — which reads as "I can't log in".
 
+**Each dependency tree is scanned exactly once, in the `security` job.**
+`pip-audit` for Python; for npm, `npm audit --json` piped into
+`frontend/scripts/check-audit.cjs`, which fails on any high/critical finding
+that is not on a reviewed, commented allow-list. The script is byte-identical
+in all three repos — only `ALLOWED_GHSA_IDS` is meant to differ. Never add a
+second `npm audit` to the frontend/build job.
+
+*Failure this prevents:* every repo ran the scan twice under two different
+policies. `aics` ran `--audit-level=high` in `security` and
+`--audit-level=critical` in `frontend`, so the weaker copy called the tree
+clean while the stricter one failed on the same lockfile. `pwdims` ran
+`--audit-level=high` against an allow-listing gate scoped to `--omit=dev`.
+Both repos therefore reported two opposite verdicts at once, and the red job
+was written off as noise while it was reporting real findings.
+
+**The npm scan covers dev dependencies.** Build tooling ships nothing to
+users, but a compromised `vite` or `postcss` compromises the bundle it
+produces. `--omit=dev` is the wrong scope for a build gate — and in practice
+the drifted dev tooling *was* the finding.
+
+**A red npm audit usually means stale dependencies, not an unfixable
+advisory.** Compare installed versions across the three repos before reaching
+for the allow-list. On 2026-08-04, `pwdims` reported six findings and `aics`
+seven where `resident-hub` reported one; every difference was version drift
+(`vite` 5.4.21 vs 6.4.3, `postcss` 8.5.16 vs 8.5.25, `undici` 7.28.0 vs
+7.29.0, `brace-expansion`), and all of it cleared with `npm update` plus one
+declared-range bump. The apps share a dependency shape, so a finding in one
+and not the others is drift until proven otherwise.
+
+**Keep `vite` inside the peer range `vitest` declares.** vitest 4 requires
+`vite ^6 || ^7 || ^8`. Against a declared `vite ^5`, npm satisfies that peer
+by installing a *second*, nested vite for the test runner — so the suite
+validates a different transform pipeline than the one that builds the
+shipped bundle, and nothing errors. `npm ls vite --all` is the only place it
+shows.
+
 ## Key custody
 
 Encryption converts a leak risk into a loss risk. An encrypted dump is
@@ -94,3 +130,14 @@ to survive is not a backup strategy. They need a durable copy off that box.
   longer reads the backend file, but the backend still does.
 - `aics-tracking-system` has no Redis, worker, or RS256 JWT keys; those
   rules apply only where the service exists.
+- `pwdims` gates `backend`/`frontend` behind `needs: security`, so a red
+  security job skips them entirely rather than running them; the other two
+  do not gate. While security was red this hid a known-failing
+  forced-password-change test. Not yet reconciled.
+- `pip-audit` still runs twice in `pwdims` and `aics` (`uvx pip-audit
+  --local` in `backend`, `uv pip install pip-audit && pip-audit
+  --skip-editable` in `security`) where `resident-hub` runs it once. Same
+  duplicate-gate shape the npm rule above fixes, not yet applied to Python.
+- The checker reports `n/a`, not `GAP`, when a file is missing entirely, so
+  a rule cannot catch a repo that simply lacks the file. Fine for genuinely
+  optional files, a hole for required ones.

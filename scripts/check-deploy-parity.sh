@@ -34,6 +34,13 @@ CHECKS=(
   "sidecar dumps encrypted|scripts/pg_backup.sh|BACKUP_ENCRYPTION_PASSPHRASE|1"
   "sidecar umask 077|scripts/pg_backup.sh|umask 077|1"
   "sidecar healthcheck glob .enc|docker-compose.prod.yml|auto-\*\.sql\.gz' |0"
+  # CI dependency gate. All three repos once ran npm audit twice under two
+  # different policies, so the same lockfile was reported clean by one job and
+  # broken by another — and the red one got treated as noise for weeks.
+  "npm gate: allow-list script|frontend/scripts/check-audit.cjs|ALLOWED_GHSA_IDS|1"
+  "npm gate: wired into CI|.github/workflows/ci.yml|check-audit\.cjs|1"
+  "npm gate: no blunt threshold|.github/workflows/ci.yml|npm audit --audit-level|0"
+  "npm gate: dev deps in scope|.github/workflows/ci.yml|npm audit.*--omit=dev|0"
 )
 
 printf '%-32s' "check"
