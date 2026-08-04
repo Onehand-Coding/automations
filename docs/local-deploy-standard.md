@@ -38,6 +38,22 @@ exist, the Docker daemon creates it as `root:root`; sidecars running as
 for hours logging `Permission denied`, looking scheduled, while **zero
 backups existed**.
 
+**`./prod up` chmods `.env.prod` to 600 before compose runs.** That file holds
+`BACKUP_ENCRYPTION_PASSPHRASE`, the DB password and every app secret.
+`cp .env.prod.example .env.prod` under the default `umask 022` creates it
+world-readable, and these apps share one office box — so every account on it
+could read the passphrase protecting the backups. Enforce it on every `up`, not
+once by hand: the next fresh clone recreates the same 0644 file.
+
+Use `if [ -f ... ]; then chmod ...; fi`, **not** `[ -f ... ] && chmod ...`.
+These scripts run `set -e`, where the `&&` form exits the whole script when the
+file is absent — swallowing compose's far more useful
+"POSTGRES_PASSWORD is required" error behind a silent early exit.
+
+*Failure this prevents:* found at 0644 in `pwdims` and `aics-tracking-system`
+on 2026-08-04, alongside encrypted-at-rest backups whose entire protection is
+that passphrase.
+
 **Backups are encrypted at rest and mode 600.** `umask 077` plus
 `openssl enc -aes-256-cbc -pbkdf2 -salt`, keyed by
 `BACKUP_ENCRYPTION_PASSPHRASE`. These dumps are the entire database in one

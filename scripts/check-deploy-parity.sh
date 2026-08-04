@@ -25,6 +25,7 @@ CHECKS=(
   "no stale '. .env' sourcing|prod|^[^#]*\. \"\\\$REPO_DIR/\.env\"|0"
   "up: mkdir+chown ./backups|prod|chown \"\\\$\(id -u\):\\\$\(id -g\)\"|1|- \./backups:"
   "up: exports HOST_UID/GID|prod|export HOST_UID|1|- \./backups:"
+  "up: chmod 600 .env.prod|prod|chmod 600 \"\\\$REPO_DIR/\.env\.prod\"|1"
   "backup: umask 077|prod|umask 077|1"
   "backup: encrypts at rest|prod|sql\.gz\.enc|1"
   "backup: retention from env|prod|env_get BACKUP_RETENTION_DAYS|1"
