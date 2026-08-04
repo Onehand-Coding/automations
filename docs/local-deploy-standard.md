@@ -72,6 +72,31 @@ CSRF allowlist, matched on exact netloc. `/auth/login` has no CSRF check
 but `/auth/refresh` does, so a missing `:7443` lets people log in and then
 bounces them at the first refresh — which reads as "I can't log in".
 
+**No `env_file:` in `docker-compose.prod.yml` — name the keys under
+`environment:`.** `env_file` injects the *whole* file and has no exclusion
+mechanism, so every service using it holds `BACKUP_ENCRYPTION_PASSPHRASE`,
+`OFFSITE_TARGET`, `GRAFANA_ADMIN_PASSWORD` and the raw DB/Redis passwords —
+inside the internet-facing backend container, which reads none of them.
+Encryption converts a leak risk into a loss risk, so the passphrase is the one
+secret with no business being in the most exposed process on the box.
+
+Use **list form** (`- KEY`), never map form (`KEY: ${KEY}`). In list form an
+unset key resolves to null and is simply not passed to the container, which is
+exactly what `env_file` did — the app's own default survives. Map form passes
+an empty string instead, silently overriding that default with `""`. Verify
+with `docker compose config`, not by reading the YAML.
+
+The authoritative key list is the app's pydantic `Settings` field set: those
+are the only keys it can read at all, so a list built from them takes nothing
+away. Add a key when you add a `Settings` field; a key that is not a `Settings`
+field does not belong there. `resident-hub` anchors the list once
+(`x-app-env: &app-env`) because `backend` and `worker` must not drift apart.
+
+*Failure this prevents:* `aics` kept a *second* env file, `backend/.env.prod`,
+purely because `env_file` could not exclude the ops secrets — and `docs/DEPLOY.md`
+never scp'd it to the server. Naming the keys removed the reason for the second
+file, so the split is gone.
+
 **Each dependency tree is scanned exactly once, in the `security` job.**
 `pip-audit` for Python; for npm, `npm audit --json` piped into
 `frontend/scripts/check-audit.cjs`, which fails on any high/critical finding
@@ -135,18 +160,5 @@ duplicate was.
 
 ## Known remaining divergences
 
-- The three apps inject backend config three different ways, and the
-  difference is a security one, not a style one. `pwdims` maps keys
-  explicitly under `environment:` — each container sees only its own
-  secrets. `resident-hub` uses `env_file: .env.prod`, so the whole file,
-  `BACKUP_ENCRYPTION_PASSPHRASE` included, is present in the web-facing
-  backend container. `aics-tracking-system` splits config across `.env.prod`
-  and `backend/.env.prod` and points `env_file` at the latter. Consolidating
-  aics onto one file would match `resident-hub` while giving its backend the
-  backup passphrase and the Grafana admin password — a regression. `pwdims`
-  is the target shape for all three; converting the other two needs the full
-  key list from each live (gitignored) `.env.prod`, since a key present
-  there but absent from `.env.prod.example` would break the app the moment
-  `env_file` stops catching it.
 - `aics-tracking-system` has no Redis, worker, or RS256 JWT keys; those
   rules apply only where the service exists.

@@ -34,6 +34,13 @@ CHECKS=(
   "sidecar dumps encrypted|scripts/pg_backup.sh|BACKUP_ENCRYPTION_PASSPHRASE|1"
   "sidecar umask 077|scripts/pg_backup.sh|umask 077|1"
   "sidecar healthcheck glob .enc|docker-compose.prod.yml|auto-\*\.sql\.gz' |0"
+  # env_file injects the *entire* file and offers no way to exclude a key, so
+  # any service using it holds BACKUP_ENCRYPTION_PASSPHRASE — the one secret
+  # whose loss costs every backup — inside the internet-facing container. Name
+  # the keys under `environment:` instead. Use list form (`- KEY`): an unset
+  # key stays unset, matching env_file. Map form (`KEY: ${KEY}`) injects "" and
+  # silently overrides the app's own default.
+  "no env_file: keys are named|docker-compose.prod.yml|^[[:space:]]*env_file:|0"
   # CI dependency gate. All three repos once ran npm audit twice under two
   # different policies, so the same lockfile was reported clean by one job and
   # broken by another — and the red one got treated as noise for weeks.
