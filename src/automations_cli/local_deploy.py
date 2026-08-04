@@ -239,6 +239,15 @@ set -e
 COMPOSE="docker compose -f docker-compose.prod.yml --env-file .env.prod"
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Read one key out of .env.prod. Deliberately NOT `set -a; . .env.prod` —
+# that file is docker-compose syntax, not shell, so an unquoted value with
+# a space makes bash run the second word as a command, which under `set -e`
+# kills the script. Sourcing it would also execute any $(...) in a value.
+env_get() {
+    [ -f "$REPO_DIR/.env.prod" ] || return 0
+    sed -n "s/^$1=//p" "$REPO_DIR/.env.prod" | head -1
+}
+
 usage() {
     echo "Usage: ./prod <command>"
     echo ""
@@ -342,7 +351,7 @@ case "$1" in
         ;;
     offsite-sync)
         BACKUP_DIR="$REPO_DIR/backups"
-        set -a && . "$REPO_DIR/.env.prod" && set +a
+        OFFSITE_TARGET="$(env_get OFFSITE_TARGET)"
         if [ -z "${OFFSITE_TARGET:-}" ]; then
             echo "OFFSITE_TARGET is not set in .env.prod — nothing to sync to." >&2
             echo "Set OFFSITE_TARGET=user@host:/path/ in .env.prod first." >&2
