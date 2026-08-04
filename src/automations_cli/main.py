@@ -81,6 +81,12 @@ def generate_project(
     flutter: bool = typer.Option(
         False, "--flutter", "-F", help="Create a Flutter project with FastAPI backend"
     ),
+    local: bool = typer.Option(
+        False,
+        "--local",
+        "-l",
+        help="[Fullstack only] Generate dev/prod scripts + prod stack for LAN deployment (implies --compose)",
+    ),
     compose: bool = typer.Option(
         False, "--compose", "-c", help="[Fullstack/Flutter only] Generate docker-compose.yml for PostgreSQL"
     ),
@@ -132,6 +138,8 @@ def generate_project(
         args.append("--flutter")
     if compose:
         args.append("--compose")
+    if local:
+        args.append("--local")
     if no_docs:
         args.append("--no-docs")
     if description:

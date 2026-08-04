@@ -393,6 +393,13 @@ Examples:
         action="store_true",
         help="[Fullstack/Flutter only] Generate docker-compose.yml for PostgreSQL",
     )
+
+    parser.add_argument(
+        "--local",
+        "-l",
+        action="store_true",
+        help="[Fullstack only] Generate dev/prod scripts + prod stack for LAN deployment (implies --compose)",
+    )
     # Docs
     parser.add_argument(
         "--no-docs",
@@ -521,7 +528,7 @@ Examples:
             full_project_path = (Path(args.path or DEFAULT_PROJECTS_DIR).expanduser() / project_name).resolve()
             full_project_path.mkdir(parents=True, exist_ok=True)
             os.chdir(full_project_path)
-            fullstack.main(project_name, compose=args.compose)
+            fullstack.main(project_name, compose=args.compose, local=args.local)
             
             # Create Sublime Text project files for fullstack projects too
             create_sublime_project(project_name, backend_in_subdir=True)

@@ -1038,6 +1038,12 @@ def create_start_script(root: Path, project_name: str):
 
     echo "🚀 Starting {project_name}..."
 
+    # Job control on: each `&` background job gets its own process group, so
+    # `kill -PID` (below) reaches that job's whole subtree — e.g. uvicorn's
+    # --reload supervisor *and* its forked worker — instead of just the top
+    # process and orphaning the rest.
+    set -m
+
     ROOT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
     BACKEND_DIR="$ROOT_DIR/backend"
     FRONTEND_DIR="$ROOT_DIR/frontend"
@@ -1051,12 +1057,15 @@ def create_start_script(root: Path, project_name: str):
     BACKEND_PID=""
     FRONTEND_PID=""
 
+    # Signals the whole process group (PGID == PID for a `set -m` background
+    # job), not just the leader — so uvicorn's --reload supervisor and its
+    # forked worker both go down together.
     graceful_kill() {{
         local pid=$1
         local name=$2
         if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
-            echo "   Sending SIGTERM to $name (PID: $pid)..."
-            kill -15 "$pid" 2>/dev/null
+            echo "   Sending SIGTERM to $name's process group (PGID: $pid)..."
+            kill -TERM -"$pid" 2>/dev/null
             for i in 1 2 3 4 5; do
                 sleep 1
                 if ! kill -0 "$pid" 2>/dev/null; then
@@ -1064,8 +1073,8 @@ def create_start_script(root: Path, project_name: str):
                     return 0
                 fi
             done
-            echo "   ⚠ Force-stopping $name..."
-            kill -9 "$pid" 2>/dev/null
+            echo "   ⚠ Force-stopping $name's process group..."
+            kill -KILL -"$pid" 2>/dev/null
         fi
         return 0
     }}
@@ -1098,8 +1107,12 @@ def create_start_script(root: Path, project_name: str):
     cleanup() {{
         echo ""
         echo "👋 Shutting down..."
-        kill -15 $BACKEND_PID $FRONTEND_PID 2>/dev/null
-        wait $BACKEND_PID $FRONTEND_PID 2>/dev/null
+        graceful_kill "$BACKEND_PID" "backend"
+        graceful_kill "$FRONTEND_PID" "frontend"
+        # Backstop: catches anything that escaped its process group (e.g. a
+        # child that called setsid) so nothing is left holding port 8000/5173.
+        pkill -15 -f 'uvicorn.*{package_name}' 2>/dev/null
+        pkill -15 -f 'vite.*frontend' 2>/dev/null
         if [ -f "$ROOT_DIR/docker-compose.yml" ]; then
             cd "$ROOT_DIR" && docker compose down
         fi
@@ -1422,8 +1435,11 @@ Both servers support hot-reloading. Make changes to the code and see them reflec
 """)
 
 
-def main(project_name: str = "my-fullstack-app", compose: bool = False):
+def main(project_name: str = "my-fullstack-app", compose: bool = False, local: bool = False):
     """Main function to orchestrate project creation."""
+    # The dev script drives a PostgreSQL container, so --local needs compose.
+    if local:
+        compose = True
     print("=" * 60)
     print("FastAPI + React Project Generator")
     print("=" * 60)
@@ -1460,8 +1476,20 @@ SECRET_KEY=your-secret-key-change-in-production
 DEBUG=True
 """)
 
-    print("\n[SCRIPT] Creating start.sh...")
-    create_start_script(root, project_name)
+    if local:
+        # ./dev (no args) does what start.sh did, so they'd be redundant.
+        print("\n[DEVOPS] Creating dev/prod scripts and prod stack...")
+        # project_generator imports this module via sys.path.append rather than
+        # as a package member, so both import styles have to work.
+        try:
+            from automations_cli import local_deploy
+        except ImportError:
+            import local_deploy
+
+        local_deploy.scaffold_local(root, project_name)
+    else:
+        print("\n[SCRIPT] Creating start.sh...")
+        create_start_script(root, project_name)
 
     # Print success message
     print("\n" + "=" * 60)
@@ -1469,11 +1497,18 @@ DEBUG=True
     print("=" * 60)
     print(f"\n[LOCATION] Project location: {root.absolute()}")
     print("\n[GUIDE] Next steps:")
-    print(f"\n  ./start.sh")
-    if compose:
+    if local:
+        print(f"\n  ./dev")
         print(f"     Starts PostgreSQL (Docker) + backend + frontend")
+        print(f"     Also: ./dev db-up | db-down | logs | status | backup | restore | nuke")
+        print(f"\n  ./prod deploy")
+        print(f"     LAN deploy over HTTPS. Copy .env.prod.example to .env.prod and fill it in first.")
     else:
-        print(f"     Starts backend + frontend")
+        print(f"\n  ./start.sh")
+        if compose:
+            print(f"     Starts PostgreSQL (Docker) + backend + frontend")
+        else:
+            print(f"     Starts backend + frontend")
     print(f"\n  Or manually:")
     print(f"\n  1. Backend setup:")
     print(f"     cd backend")
@@ -1494,9 +1529,14 @@ if __name__ == "__main__":
         parser = argparse.ArgumentParser(description="Create a fullstack FastAPI + React project")
         parser.add_argument("project_name", nargs="?", default="my-fullstack-app", help="Name of the project")
         parser.add_argument("--compose", action="store_true", help="Generate docker-compose.yml for PostgreSQL")
-        
+        parser.add_argument(
+            "--local",
+            action="store_true",
+            help="Generate dev/prod scripts + prod stack for LAN deployment (implies --compose)",
+        )
+
         args = parser.parse_args()
-        main(args.project_name, compose=args.compose)
+        main(args.project_name, compose=args.compose, local=args.local)
     except KeyboardInterrupt:
         print("\nCancelled.")
         sys.exit(130)
