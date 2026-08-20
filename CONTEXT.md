@@ -37,6 +37,14 @@ A Python CLI tool for automating development and file management tasks — proje
 ### Recent Work
 - Fixed `passlib` + `bcrypt>=5.0.0` incompatibility — pinned `bcrypt<5.0.0` in flutter pyproject.toml template
 - End-to-end verified: Flutter analyze (0 errors, 0 warnings), backend starts, demo user seeds, login works
+- Fixed `process-takeout` CLI wrapper to match `gphotos_takeout_organizer.py`'s real args (positional `takeout_dir` + `--dry-run/--delete-json/--verbose/--yes`); previously passed bogus `--source`/`--dest`
+- Processed Aug 2026 takeout (~1270 media files): all embedded dates verified against JSON `photoTakenTime`
+
+### Takeout Gotchas
+- Requires `exiftool` on PATH (Fedora: `dnf install perl-Image-ExifTool`)
+- New-format takeouts use `<name>.supplemental-metadata.json` — matched via the general suffix fallback in `find_matching_json`
+- Duplicate-pair naming bug: for `x.jpg` + `x(1).jpg` pairs, pattern 5 matches the original to the `(1)` JSON (`(` sorts before `.`) and the `(1)` file matches nothing — fix manually after running (dates are identical)
+- Files Google uploads with wrong extension (PNG content as `.jpg`) fail exiftool — rename to the real extension and re-embed
 
 ## Next Steps
 - (none outstanding)

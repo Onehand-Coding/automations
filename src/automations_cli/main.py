@@ -290,15 +290,33 @@ def organize_files(
 
 @app.command()
 def process_takeout(
-    source: str = typer.Option(
-        ..., "--source", help="Source directory of the Google Photos Takeout."
+    takeout_dir: str = typer.Argument(
+        ..., help="Path to the root of extracted Google Photos Takeout directory."
     ),
-    dest: str = typer.Option(
-        ..., "--dest", help="Destination directory to organize photos into."
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Simulate the process without modifying or deleting any files."
+    ),
+    delete_json: bool = typer.Option(
+        False, "--delete-json", help="Delete JSON files after successfully embedding metadata (prompts for confirmation)."
+    ),
+    verbose: bool = typer.Option(
+        False, "--verbose", help="Print detailed logs (INFO+) to the console in addition to the log file."
+    ),
+    yes: bool = typer.Option(
+        False, "--yes", help="Automatically confirm JSON deletion (use with caution!)."
     ),
 ):
-    """Organizes a Google Photos Takeout archive."""
-    _run_script("gphotos_takeout_organizer.py", ["--source", source, "--dest", dest])
+    """Embeds metadata from Google Photos Takeout JSON files into corresponding media files."""
+    args = [takeout_dir]
+    if dry_run:
+        args.append("--dry-run")
+    if delete_json:
+        args.append("--delete-json")
+    if verbose:
+        args.append("--verbose")
+    if yes:
+        args.append("--yes")
+    _run_script("gphotos_takeout_organizer.py", args)
 
 
 @app.command()
