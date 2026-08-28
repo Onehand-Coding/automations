@@ -85,7 +85,7 @@ def generate_project(
         False,
         "--local",
         "-l",
-        help="[Fullstack only] Generate dev/prod scripts + prod stack for LAN deployment (implies --compose)",
+        help="[Fullstack/Flutter] Generate dev/prod scripts + prod stack for LAN deployment (implies --compose)",
     ),
     compose: bool = typer.Option(
         False, "--compose", "-c", help="[Fullstack/Flutter only] Generate docker-compose.yml for PostgreSQL"

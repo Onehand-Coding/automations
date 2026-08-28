@@ -1,12 +1,19 @@
-"""Local-deployment (LAN) devops scaffolding for generated fullstack projects.
+"""Devops scaffolding for generated fullstack/flutter projects.
 
-Emits the `dev` / `prod` script pair used by the MSWD projects (resident-hub,
-pwdims, aics-tracking-system) plus the prod compose stack they drive.
+Emits the devops layer shared by Kenneth's apps (resident-hub, pwdims,
+aics-tracking-system, seniorhub, solo-parent-hub, muni-track, maco-website):
 
-This is for apps deployed on a LAN box that staff reach by IP — hence the
-self-signed certificate issued for the host's LAN IP. A public/VPS deployment
-needs real certificates (Caddy or nginx + Let's Encrypt against a domain), so
-`prod tls` and `prod deploy` here do NOT transfer to that case.
+- always: ./dev, CI workflow (.github/workflows/ci.yml), image Dockerfiles
+  (--local=False uses a plain-HTTP nginx conf; CI publishes to ghcr either way)
+- --local adds: ./prod, docker-compose.prod.yml, .env.prod.example and the
+  TLS nginx conf for LAN boxes where staff reach the app by IP — hence the
+  self-signed certificate issued for the host's LAN IP. A public/VPS
+  deployment needs real certificates (Caddy or nginx + Let's Encrypt against
+  a domain), so `prod tls` and `prod deploy` here do NOT transfer to that case.
+
+The rules these templates encode live in ~/Coding/projects/standards
+(docs/local-deploy-standard.md); scripts/check-deploy-parity.sh there audits a
+repo against them. Update that doc when a template change encodes a new rule.
 
 Templates are plain strings with __TOKEN__ placeholders rather than f-strings:
 shell and YAML are dense with braces, and doubling every one of them is a
@@ -16,12 +23,26 @@ reliable source of bugs.
 import stat
 from pathlib import Path
 
+try:
+    from automations_cli.versions import (
+        FLUTTER_BUILD_IMAGE,
+        NODE_DOCKER_IMAGE,
+        NODE_ENGINES,
+        NODE_MAJOR,
+    )
+except ImportError:  # imported as a top-level module via sys.path.append
+    from versions import FLUTTER_BUILD_IMAGE, NODE_DOCKER_IMAGE, NODE_ENGINES, NODE_MAJOR
+
 
 def _write(path: Path, content: str, project_name: str, executable: bool = False):
     package_name = project_name.replace("-", "_")
     rendered = (
         content.replace("__PROJECT__", project_name)
         .replace("__PACKAGE__", package_name)
+        .replace("__NODE_MAJOR__", NODE_MAJOR)
+        .replace("__NODE_ENGINES__", NODE_ENGINES)
+        .replace("__NODE_DOCKER_IMAGE__", NODE_DOCKER_IMAGE)
+        .replace("__FLUTTER_BUILD_IMAGE__", FLUTTER_BUILD_IMAGE)
         .lstrip("\n")
     )
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -157,17 +178,39 @@ case "${1:-}" in
         fi
 
         pkill -15 -f 'uvicorn.*__PACKAGE__' 2>/dev/null
-        pkill -15 -f 'vite.*frontend' 2>/dev/null
+        pkill -15 -f '__FRONTEND_PKILL__' 2>/dev/null
 
         sleep 1
         echo "Cleanup complete"
         echo ""
 
-        echo "Starting PostgreSQL..."
-        cd "$ROOT_DIR"
-        docker compose up -d
-        echo "DB ready"
-        echo ""
+        # DB is optional: projects generated without --compose run on SQLite.
+        if [ -f "$ROOT_DIR/docker-compose.yml" ]; then
+            echo "Starting PostgreSQL..."
+            cd "$ROOT_DIR"
+            docker compose up -d
+
+            DB_CONTAINER=$(docker compose ps -q db)
+            for _ in $(seq 1 30); do
+                docker exec "$DB_CONTAINER" pg_isready -U postgres >/dev/null 2>&1 && break
+                sleep 1
+            done
+
+            # Alembic owns the schema once initialized; starting the backend
+            # against a stale schema produces errors that look like app bugs.
+            # Projects that have not run `alembic-init` yet skip this.
+            if [ -f "$BACKEND_DIR/alembic.ini" ]; then
+                echo "Applying database migrations..."
+                (cd "$BACKEND_DIR" && uv run db-upgrade) || {
+                    echo "Migration failed — fix it before starting (./dev db-down to stop the DB)." >&2
+                    exit 1
+                }
+                echo "Database up to date"
+            fi
+
+            echo "DB ready"
+            echo ""
+        fi
 
         cleanup() {
             echo ""
@@ -176,8 +219,10 @@ case "${1:-}" in
             graceful_kill "$FRONTEND_PID" "frontend"
             # Backstop: catches anything that escaped its process group.
             pkill -15 -f 'uvicorn.*__PACKAGE__' 2>/dev/null
-            pkill -15 -f 'vite.*frontend' 2>/dev/null
-            cd "$ROOT_DIR" && docker compose down
+            pkill -15 -f '__FRONTEND_PKILL__' 2>/dev/null
+            if [ -f "$ROOT_DIR/docker-compose.yml" ]; then
+                cd "$ROOT_DIR" && docker compose down
+            fi
             exit 0
         }
 
@@ -193,7 +238,7 @@ case "${1:-}" in
 
         echo "Starting frontend..."
         cd "$FRONTEND_DIR"
-        npm run dev &
+        __FRONTEND_CMD__ &
         FRONTEND_PID=$!
         echo "Frontend running on http://localhost:5173"
         echo ""
@@ -218,7 +263,7 @@ EOF
         echo "Usage: ./dev [command]"
         echo ""
         echo "Commands:"
-        echo "  (none)      Start everything — DB (Docker), backend, frontend"
+        echo "  (none)      Start everything — DB (if compose exists), backend, frontend"
         echo "  db-up       Start only the PostgreSQL container"
         echo "  db-down     Stop the PostgreSQL container"
         echo "  logs        Tail dev container logs (optional: ./dev logs db)"
@@ -293,6 +338,26 @@ case "$1" in
         $COMPOSE pull --ignore-pull-failures
         ;;
     up)
+        # .env.prod holds BACKUP_ENCRYPTION_PASSPHRASE, the DB password and
+        # every app secret. cp .env.prod.example .env.prod under the default
+        # umask 022 creates it world-readable, and these apps share one office
+        # box. Enforced on every `up` rather than fixed once: the next fresh
+        # clone recreates the same 0644 file. `if`, not `[ -f ] && chmod`:
+        # under set -e the && form exits the whole script when the file is
+        # absent, swallowing compose's much more useful "POSTGRES_PASSWORD is
+        # required" error.
+        if [ -f "$REPO_DIR/.env.prod" ]; then
+            chmod 600 "$REPO_DIR/.env.prod"
+        fi
+
+        # Create ./backups before compose runs. If a bind-mount source does not
+        # exist, the Docker daemon creates it as root:root, and backup sidecars
+        # running as HOST_UID:HOST_GID cannot write into it — they sit
+        # unhealthy logging "Permission denied" while zero backups exist.
+        mkdir -p "$REPO_DIR/backups"
+        chown "$(id -u):$(id -g)" "$REPO_DIR/backups"
+        export HOST_UID="$(id -u)" HOST_GID="$(id -g)"
+
         echo "Starting production stack..."
         $COMPOSE up -d
         $COMPOSE ps
@@ -519,7 +584,7 @@ CMD ["uv", "run", "start"]
 
 
 FRONTEND_DOCKERFILE = """
-FROM node:24-alpine AS build
+FROM __NODE_DOCKER_IMAGE__ AS build
 
 WORKDIR /app
 COPY package.json package-lock.json ./
@@ -529,8 +594,46 @@ RUN npm run build
 
 FROM nginx:alpine
 COPY --from=build /app/dist /usr/share/nginx/html
-COPY nginx-tls.conf /etc/nginx/conf.d/default.conf
+COPY __NGINX_CONF__ /etc/nginx/conf.d/default.conf
 EXPOSE 80 443
+"""
+
+
+FLUTTER_FRONTEND_DOCKERFILE = """
+FROM __FLUTTER_BUILD_IMAGE__ AS build
+
+WORKDIR /app
+COPY . .
+RUN flutter pub get && flutter build web
+
+FROM nginx:alpine
+COPY --from=build /app/build/web /usr/share/nginx/html
+COPY __NGINX_CONF__ /etc/nginx/conf.d/default.conf
+EXPOSE 80 443
+"""
+
+
+NGINX_CONF = """
+server {
+    listen 80;
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # SPA routing: unknown paths fall through to index.html.
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /api/ {
+        proxy_pass http://backend:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
 """
 
 
@@ -567,27 +670,560 @@ server {
 """
 
 
-def scaffold_local(root: Path, project_name: str):
-    """Emit the LAN-deployment dev/prod scripts and their supporting stack.
+CI_WORKFLOW_REACT = """
+name: CI
 
-    Replaces start.sh: `./dev` with no arguments does what start.sh did, and
-    the subcommands cover the database and backup lifecycle around it.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: onehand-coding/__PROJECT__
+
+permissions:
+  contents: read
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      # Single owner of dependency scanning for both trees (dev deps included
+      # — build tooling ships nothing, but a compromised vite compromises the
+      # artifact it produces). Never add a second npm/pip audit elsewhere under
+      # different flags: two verdicts on one lockfile reads as noise.
+      - name: Install backend deps (for pip-audit)
+        working-directory: backend
+        run: uv sync --frozen
+
+      - name: pip-audit
+        working-directory: backend
+        run: |
+          uv pip install pip-audit
+          uv run pip-audit --skip-editable
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "__NODE_MAJOR__"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+
+      - name: npm audit
+        working-directory: frontend
+        run: |
+          # npm audit exits non-zero on *any* finding, including allow-listed
+          # ones, so it must not short-circuit before check-audit.cjs applies
+          # the allow-list.
+          npm audit --json > audit-result.json || true
+          node scripts/check-audit.cjs < audit-result.json
+
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        working-directory: backend
+        run: uv sync --frozen
+
+      - name: Run tests
+        working-directory: backend
+        run: uv run pytest -v
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "__NODE_MAJOR__"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm run test
+
+      - name: Type-check + build
+        run: npm run build
+
+  image-scan:
+    # OS-layer scan of the built images; complements the security job, which
+    # owns the Python/npm dependency trees. Built via buildx with a GHA cache
+    # export (same scope build-and-push reads from) so the image cd publishes
+    # is a cache-hit reproduction of *this exact* scanned image, not a fresh
+    # rebuild from source that Trivy never saw.
+    needs: [security, backend, frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build backend image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./backend
+          push: false
+          load: true
+          tags: __PROJECT__-backend:ci
+          cache-from: type=gha,scope=backend-image
+          cache-to: type=gha,mode=max,scope=backend-image
+
+      - name: Scan backend image for CRITICAL vulnerabilities (blocking)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: __PROJECT__-backend:ci
+          format: table
+          severity: CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+
+      - name: Scan backend image for HIGH vulnerabilities (report only)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: __PROJECT__-backend:ci
+          format: table
+          severity: HIGH
+          exit-code: "0"
+          ignore-unfixed: true
+
+      - name: Build frontend image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./frontend
+          push: false
+          load: true
+          tags: __PROJECT__-frontend:ci
+          cache-from: type=gha,scope=frontend-image
+          cache-to: type=gha,mode=max,scope=frontend-image
+
+      - name: Scan frontend image for CRITICAL vulnerabilities (blocking)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: __PROJECT__-frontend:ci
+          format: table
+          severity: CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+
+      - name: Scan frontend image for HIGH vulnerabilities (report only)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: __PROJECT__-frontend:ci
+          format: table
+          severity: HIGH
+          exit-code: "0"
+          ignore-unfixed: true
+
+  cd:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [image-scan]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend
+        uses: docker/build-push-action@v7
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:latest
+          cache-from: type=gha,scope=backend-image
+          cache-to: type=gha,mode=max,scope=backend-image
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@v7
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:latest
+          cache-from: type=gha,scope=frontend-image
+          cache-to: type=gha,mode=max,scope=frontend-image
+"""
+
+
+CI_WORKFLOW_FLUTTER = """
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: onehand-coding/__PROJECT__
+
+permissions:
+  contents: read
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install backend deps (for pip-audit)
+        working-directory: backend
+        run: uv sync --frozen
+
+      - name: pip-audit
+        working-directory: backend
+        run: |
+          uv pip install pip-audit
+          uv run pip-audit --skip-editable
+
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        working-directory: backend
+        run: uv sync --frozen
+
+      - name: Run tests
+        working-directory: backend
+        run: uv run pytest -v
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
+
+      - name: Build web
+        run: flutter build web
+
+  image-scan:
+    # OS-layer scan of the built images; complements the security job, which
+    # owns the Python/npm dependency trees. Built via buildx with a GHA cache
+    # export (same scope build-and-push reads from) so the image cd publishes
+    # is a cache-hit reproduction of *this exact* scanned image, not a fresh
+    # rebuild from source that Trivy never saw.
+    needs: [security, backend, frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build backend image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./backend
+          push: false
+          load: true
+          tags: __PROJECT__-backend:ci
+          cache-from: type=gha,scope=backend-image
+          cache-to: type=gha,mode=max,scope=backend-image
+
+      - name: Scan backend image for CRITICAL vulnerabilities (blocking)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: __PROJECT__-backend:ci
+          format: table
+          severity: CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+
+      - name: Scan backend image for HIGH vulnerabilities (report only)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: __PROJECT__-backend:ci
+          format: table
+          severity: HIGH
+          exit-code: "0"
+          ignore-unfixed: true
+
+      - name: Build frontend image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./frontend
+          push: false
+          load: true
+          tags: __PROJECT__-frontend:ci
+          cache-from: type=gha,scope=frontend-image
+          cache-to: type=gha,mode=max,scope=frontend-image
+
+      - name: Scan frontend image for CRITICAL vulnerabilities (blocking)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: __PROJECT__-frontend:ci
+          format: table
+          severity: CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+
+      - name: Scan frontend image for HIGH vulnerabilities (report only)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: __PROJECT__-frontend:ci
+          format: table
+          severity: HIGH
+          exit-code: "0"
+          ignore-unfixed: true
+
+  cd:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [image-scan]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend
+        uses: docker/build-push-action@v7
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:latest
+          cache-from: type=gha,scope=backend-image
+          cache-to: type=gha,mode=max,scope=backend-image
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@v7
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:latest
+          cache-from: type=gha,scope=frontend-image
+          cache-to: type=gha,mode=max,scope=frontend-image
+"""
+
+
+CHECK_AUDIT_CJS = """
+#!/usr/bin/env node
+// Fails CI on any high/critical advisory that isn't on the small, reviewed
+// allow-list below. Reads `npm audit --json` from stdin — see the "npm audit"
+// step of the `security` job in .github/workflows/ci.yml.
+//
+// Native `npm audit --audit-level=high` has no way to allow-list a specific
+// known/accepted advisory, so a blanket severity gate lets real high-severity
+// issues through indefinitely. This keeps the gate strict while tracking
+// today's reviewed exceptions explicitly, rather than silently.
+//
+// Shared verbatim across the sibling repos; only ALLOWED_GHSA_IDS and its
+// rationale comment are per-app. Keep the logic in sync when changing any copy.
+const fs = require("fs");
+const data = JSON.parse(fs.readFileSync(0, "utf8"));
+
+// Empty by design: a freshly generated project starts clean. When an advisory
+// lands that you have reviewed and accepted, add its GHSA id here WITH the
+// rationale (what exposes you, why it does not apply to this app, and what
+// upstream fix would let you remove it). An allow-list entry without a
+// rationale is how gates rot.
+const ALLOWED_GHSA_IDS = new Set([]);
+
+const vulnerabilities = data.vulnerabilities || {};
+const unexpected = [];
+
+for (const pkg of Object.values(vulnerabilities)) {
+  if (pkg.severity !== "high" && pkg.severity !== "critical") continue;
+  for (const via of pkg.via || []) {
+    if (typeof via !== "object" || !via.url) continue;
+    const match = via.url.match(/advisories\\/(GHSA-[a-z0-9-]+)/i);
+    const id = match ? match[1] : via.url;
+    if (!ALLOWED_GHSA_IDS.has(id)) {
+      unexpected.push(`${pkg.name}: ${via.title} (${id}, severity=${pkg.severity})`);
+    }
+  }
+}
+
+if (unexpected.length > 0) {
+  console.error("Unexpected high/critical vulnerabilities (not on the reviewed allow-list):");
+  for (const line of unexpected) console.error(`  - ${line}`);
+  process.exit(1);
+}
+console.log("No unexpected high/critical vulnerabilities (allow-listed advisories only, if any).");
+"""
+
+
+def scaffold_devops(root: Path, project_name: str, flavor: str = "react", local: bool = False):
+    """Emit the devops layer: ./dev always; ./prod + prod stack when local=True.
+
+    Also always emits CI (.github/workflows/ci.yml), the audit gate script and
+    the image Dockerfiles, so a freshly generated repo is CI-green and
+    publishable to ghcr on day one.
+
+    flavor: "react" (npm/vite frontend) or "flutter" (flutter run frontend).
     """
-    _write(root / "dev", DEV_SCRIPT, project_name, executable=True)
-    _write(root / "prod", PROD_SCRIPT, project_name, executable=True)
-    _write(root / "docker-compose.prod.yml", PROD_COMPOSE, project_name)
-    _write(root / ".env.prod.example", ENV_PROD_EXAMPLE, project_name)
-    _write(root / "backend" / "Dockerfile", BACKEND_DOCKERFILE, project_name)
-    _write(root / "frontend" / "Dockerfile", FRONTEND_DOCKERFILE, project_name)
-    _write(root / "frontend" / "nginx-tls.conf", NGINX_TLS_CONF, project_name)
+    if flavor == "react":
+        dev_script = DEV_SCRIPT.replace(
+            "__FRONTEND_CMD__", "npm run dev"
+        ).replace("__FRONTEND_PKILL__", "vite.*frontend")
+        ci_workflow = CI_WORKFLOW_REACT
+    elif flavor == "flutter":
+        dev_script = DEV_SCRIPT.replace(
+            "__FRONTEND_CMD__", "flutter run -d chrome"
+        ).replace("__FRONTEND_PKILL__", "flutter_tools")
+        ci_workflow = CI_WORKFLOW_FLUTTER
+    else:
+        raise ValueError(f"Unknown flavor: {flavor!r} (expected 'react' or 'flutter')")
 
-    # Real secrets and generated certs must never be committed.
+    _write(root / "dev", dev_script, project_name, executable=True)
+    _write(root / ".github" / "workflows" / "ci.yml", ci_workflow, project_name)
+
+    if flavor == "react":
+        _write(root / "frontend" / "scripts" / "check-audit.cjs", CHECK_AUDIT_CJS, project_name)
+
+    nginx_conf = "nginx-tls.conf" if local else "nginx.conf"
+    _write(root / "nginx.conf", NGINX_CONF, project_name)
+    if local:
+        _write(root / "nginx-tls.conf", NGINX_TLS_CONF, project_name)
+
+    if flavor == "react":
+        _write(
+            root / "frontend" / "Dockerfile",
+            FRONTEND_DOCKERFILE.replace("__NGINX_CONF__", nginx_conf),
+            project_name,
+        )
+    else:
+        _write(
+            root / "frontend" / "Dockerfile",
+            FLUTTER_FRONTEND_DOCKERFILE.replace("__NGINX_CONF__", nginx_conf),
+            project_name,
+        )
+    _write(root / "backend" / "Dockerfile", BACKEND_DOCKERFILE, project_name)
+
+    if local:
+        _write(root / "prod", PROD_SCRIPT, project_name, executable=True)
+        _write(root / "docker-compose.prod.yml", PROD_COMPOSE, project_name)
+        _write(root / ".env.prod.example", ENV_PROD_EXAMPLE, project_name)
+
+    _update_gitignore(root, project_name)
+
+
+def ensure_lockfiles(root: Path, flavor: str = "react"):
+    """Best-effort lockfile bootstrap so CI's frozen installs work on day one.
+
+    CI runs `uv sync --frozen` and `npm ci`, both of which require committed
+    lockfiles a fresh generator run does not have. Resolution-only commands
+    (`uv lock`, `npm install --package-lock-only`) avoid installing full
+    dependency trees during generation; failure is non-fatal — the user just
+    commits locks after their first manual sync/install instead.
+    """
+    import subprocess
+
+    backend = root / "backend"
+    if subprocess.run(["uv", "lock"], cwd=backend, capture_output=True).returncode == 0:
+        print("[OK] Created: backend/uv.lock")
+    else:
+        print("[WARN] Could not create backend/uv.lock (uv missing or offline?). "
+              "Run `uv lock` in backend/ before pushing.")
+
+    if flavor == "react":
+        frontend = root / "frontend"
+        result = subprocess.run(
+            ["npm", "install", "--package-lock-only", "--ignore-scripts"],
+            cwd=frontend,
+            capture_output=True,
+        )
+        if result.returncode == 0:
+            print("[OK] Created: frontend/package-lock.json")
+        else:
+            print("[WARN] Could not create frontend/package-lock.json (npm missing or offline?). "
+                  "Run `npm install` in frontend/ before pushing.")
+
+
+def _update_gitignore(root: Path, project_name: str):
+    """Real secrets and generated certs must never be committed."""
     gitignore = root / ".gitignore"
     additions = [".env.prod", "frontend/certs/", "backups/", f".{project_name.replace('-', '_')}.pids"]
     existing = gitignore.read_text(encoding="utf-8") if gitignore.exists() else ""
     missing = [entry for entry in additions if entry not in existing.split()]
     if missing:
         with gitignore.open("a", encoding="utf-8") as handle:
-            handle.write("\n# Local-deployment devops (./dev, ./prod)\n")
+            handle.write("\n# Devops scaffolding (./dev, ./prod)\n")
             handle.write("\n".join(missing) + "\n")
         print(f"[OK] Updated: {gitignore}")

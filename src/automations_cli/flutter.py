@@ -6,7 +6,7 @@ Based on patterns from docdesk (Flutter) and fullstack.py (generator architectur
 """
 
 import os
-import stat
+import sys
 from pathlib import Path
 import textwrap
 
@@ -49,6 +49,15 @@ def create_backend(root: Path, project_name: str):
         "python-multipart>=0.0.6",
         "python-dotenv>=1.0.0",
     ]
+
+    [dependency-groups]
+    dev = [
+        "pytest>=8.0",
+        "httpx>=0.27",
+    ]
+
+    [tool.pytest.ini_options]
+    testpaths = ["tests"]
 
     [project.scripts]
     dev = "{package_name}.scripts:dev"
@@ -363,6 +372,21 @@ def create_backend(root: Path, project_name: str):
             timestamp=datetime.now(timezone.utc),
             service="{project_name} API",
         )
+    """)
+
+    # Sample test so `uv run pytest` (and CI's backend job) is green on day one
+    create_file(backend / "tests" / "test_health.py", f"""
+    from fastapi.testclient import TestClient
+
+    from {package_name}.main import app
+
+    client = TestClient(app)
+
+
+    def test_health_check():
+        response = client.get("/api/health")
+        assert response.status_code == 200
+        assert response.json()["status"] == "healthy"
     """)
 
     # src/{package_name}/routers/auth.py
@@ -1198,7 +1222,14 @@ def create_readme(root: Path, project_name: str):
     - [ ] Configure Alembic migrations
     - [ ] Add more API endpoints
     - [ ] Add Flutter screens and features
-    - [ ] Set up CI/CD
+
+    ## Devops
+
+    - `./dev` starts backend + Flutter frontend; subcommands manage the DB and
+      backups (`./dev db-up | db-down | logs | status | backup | restore | nuke`)
+    - CI (.github/workflows/ci.yml) analyzes/tests/builds both sides on PRs and
+      publishes images to ghcr.io on main. It needs backend/uv.lock committed —
+      bootstrapped at generation.
     """)
 
 
@@ -1268,123 +1299,6 @@ def create_gitignore(root: Path):
     """)
 
 
-def create_start_script(root: Path, project_name: str):
-    """Create start.sh script for running backend + Flutter (based on docdesk pattern)."""
-    package_name = project_name.replace("-", "_")
-
-    create_file(root / "start.sh", f"""
-    #!/bin/bash
-    echo "🚀 Starting {project_name}..."
-
-    ROOT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
-    BACKEND_DIR="$ROOT_DIR/backend"
-    FRONTEND_DIR="$ROOT_DIR/frontend"
-
-    # ==================================
-    # Cleanup existing processes
-    # ==================================
-    echo "🧹 Cleaning up existing processes..."
-    PID_FILE="$ROOT_DIR/.{package_name}.pids"
-    BACKEND_PID=""
-    FRONTEND_PID=""
-
-    graceful_kill() {{
-        local pid=$1
-        local name=$2
-        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
-            echo "   Sending SIGTERM to $name (PID: $pid)..."
-            kill -15 "$pid" 2>/dev/null
-            for i in 1 2 3 4 5; do
-                sleep 1
-                if ! kill -0 "$pid" 2>/dev/null; then
-                    echo "   ✓ $name stopped gracefully"
-                    return 0
-                fi
-            done
-            echo "   ⚠ Force-stopping $name..."
-            kill -9 "$pid" 2>/dev/null
-        fi
-        return 0
-    }}
-
-    if [ -f "$PID_FILE" ]; then
-        source "$PID_FILE"
-        [ -n "$BACKEND_PID" ] && graceful_kill "$BACKEND_PID" "backend"
-        [ -n "$FRONTEND_PID" ] && graceful_kill "$FRONTEND_PID" "frontend"
-        rm -f "$PID_FILE"
-    fi
-
-    pkill -15 -f 'uvicorn.*{package_name}' 2>/dev/null
-    sleep 1
-    echo "✅ Cleanup complete"
-    echo ""
-
-    # ==================================
-    # Start Docker services
-    # ==================================
-    if [ -f "$ROOT_DIR/docker-compose.yml" ]; then
-        echo "🐳 Starting Docker services..."
-        cd "$ROOT_DIR"
-        docker compose up -d
-        echo "✅ Docker services ready"
-        echo ""
-    fi
-
-    # ==================================
-    # Start backend (background)
-    # ==================================
-    echo "📦 Starting backend..."
-    cd "$BACKEND_DIR"
-    unset VIRTUAL_ENV
-    uv run dev &
-    BACKEND_PID=$!
-    echo "✅ Backend running on http://localhost:8000"
-    echo ""
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "  Demo credentials:"
-    echo "  Email:    demo@example.com"
-    echo "  Password: demo1234"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo ""
-
-    sleep 2
-
-    # ==================================
-    # Start frontend (foreground — enables 'r' for hot reload)
-    # ==================================
-    echo "🎨 Starting Flutter frontend..."
-    echo "──────────────────────────────────────"
-    echo "  Type 'r' for hot reload"
-    echo "  Press Ctrl+C or 'q' to quit"
-    echo "──────────────────────────────────────"
-    echo ""
-    cd "$FRONTEND_DIR"
-    flutter run -d chrome
-
-    # Frontend exited; clean up backend and Docker
-    echo ""
-    echo "🧹 Stopping backend..."
-    kill -15 "$BACKEND_PID" 2>/dev/null
-    wait "$BACKEND_PID" 2>/dev/null
-    echo "✅ Backend stopped"
-
-    if [ -f "$ROOT_DIR/docker-compose.yml" ]; then
-        cd "$ROOT_DIR"
-        docker compose down
-        echo "✅ Docker stopped"
-    fi
-
-    cat > "$PID_FILE" << EOF
-    BACKEND_PID=
-    FRONTEND_PID=
-    EOF
-    """)
-
-    start_script = root / "start.sh"
-    start_script.chmod(start_script.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-    print(f"[OK] Made executable: {start_script}")
-
-
 def create_docker_compose(root: Path, project_name: str):
     """Create docker-compose.yml for PostgreSQL."""
     db_name = project_name.replace("-", "_")
@@ -1415,8 +1329,11 @@ def create_docker_compose(root: Path, project_name: str):
     """)
 
 
-def main(project_name: str = "my-flutter-app", compose: bool = False):
+def main(project_name: str = "my-flutter-app", compose: bool = False, local: bool = False):
     """Main function to orchestrate Flutter + FastAPI project creation."""
+    # The dev script drives a PostgreSQL container, so --local needs compose.
+    if local:
+        compose = True
     print("=" * 60)
     print("FastAPI + Flutter Project Generator")
     print("=" * 60)
@@ -1452,16 +1369,32 @@ ACCESS_TOKEN_EXPIRE_MINUTES=480
 DEBUG=True
 """)
 
-    print("\n[SCRIPT] Creating start.sh...")
-    create_start_script(root, project_name)
+    print("\n[DEVOPS] Creating ./dev, CI workflow and Dockerfiles...")
+    # project_generator imports this module via sys.path.append rather than
+    # as a package member, so both import styles have to work.
+    try:
+        from automations_cli import local_deploy
+    except ImportError:
+        import local_deploy
+
+    local_deploy.scaffold_devops(root, project_name, flavor="flutter", local=local)
+    local_deploy.ensure_lockfiles(root, flavor="flutter")
 
     print("\n" + "=" * 60)
     print("[SUCCESS] Project created successfully!")
     print("=" * 60)
     print(f"\n[LOCATION] {root.absolute()}")
     print("\n[GUIDE] Next steps:")
-    print(f"\n  ./start.sh")
-    print(f"     Starts backend + Flutter")
+    print("\n  ./dev")
+    if compose:
+        print("     Starts PostgreSQL (Docker) + backend + Flutter")
+    else:
+        print("     Starts backend + Flutter (SQLite)")
+    print("     Also: ./dev db-up | db-down | logs | status | backup | restore | nuke")
+    if local:
+        print("\n  ./prod deploy")
+        print("     LAN deploy over HTTPS. Copy .env.prod.example to .env.prod and fill it in first.")
+        print("     Also: ./prod build | pull | up | down | logs | status | backup | restore | offsite-sync | tls | nuke")
     print(f"\n  Or manually:")
     print(f"\n  1. Backend setup:")
     print(f"     cd backend")
@@ -1481,6 +1414,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Create a Flutter + FastAPI project")
     parser.add_argument("project_name", nargs="?", default="my-flutter-app", help="Name of the project")
     parser.add_argument("--compose", action="store_true", help="Generate docker-compose.yml for PostgreSQL")
+    parser.add_argument(
+        "--local",
+        action="store_true",
+        help="Generate dev/prod scripts + prod stack for LAN deployment (implies --compose)",
+    )
 
     args = parser.parse_args()
-    main(args.project_name, compose=args.compose)
+    main(args.project_name, compose=args.compose, local=args.local)

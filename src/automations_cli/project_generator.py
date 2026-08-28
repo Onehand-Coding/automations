@@ -398,7 +398,7 @@ Examples:
         "--local",
         "-l",
         action="store_true",
-        help="[Fullstack only] Generate dev/prod scripts + prod stack for LAN deployment (implies --compose)",
+        help="[Fullstack/Flutter] Generate dev/prod scripts + prod stack for LAN deployment (implies --compose)",
     )
     # Docs
     parser.add_argument(
@@ -546,9 +546,9 @@ Examples:
             logger.info("\nNext steps:")
             logger.info(f"1. cd {full_project_path}")
             if args.compose:
-                logger.info("2. ./start.sh  (starts PostgreSQL + backend + frontend)")
+                logger.info("2. ./dev  (starts PostgreSQL + backend + frontend)")
             else:
-                logger.info("2. ./start.sh  (starts backend + frontend)")
+                logger.info("2. ./dev  (starts backend + frontend)")
             logger.info("   Or manually:")
             logger.info("   Backend: cd backend && uv sync && uv run dev")
             logger.info("   Frontend: cd frontend && npm install && npm run dev")
@@ -566,7 +566,7 @@ Examples:
             full_project_path = (Path(args.path or DEFAULT_PROJECTS_DIR).expanduser() / project_name).resolve()
             full_project_path.mkdir(parents=True, exist_ok=True)
             os.chdir(full_project_path)
-            flutter.main(project_name, compose=args.compose)
+            flutter.main(project_name, compose=args.compose, local=args.local)
             
             create_sublime_project(project_name, backend_in_subdir=True)
             init_git_repo(args.no_git)
@@ -579,9 +579,9 @@ Examples:
             logger.info("\nNext steps:")
             logger.info(f"1. cd {full_project_path}")
             if args.compose:
-                logger.info("2. ./start.sh  (starts PostgreSQL + backend + frontend)")
+                logger.info("2. ./dev  (starts PostgreSQL + backend + frontend)")
             else:
-                logger.info("2. ./start.sh  (starts backend + frontend)")
+                logger.info("2. ./dev  (starts backend + frontend)")
             logger.info("   Or manually:")
             logger.info("   Backend: cd backend && uv sync && uv run dev")
             logger.info("   Frontend: cd frontend && flutter pub get && flutter run")

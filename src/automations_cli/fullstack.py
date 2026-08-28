@@ -6,9 +6,13 @@ Automates the creation of a full-stack project with FastAPI backend and React fr
 
 import os
 import sys
-import stat
 from pathlib import Path
 import textwrap
+
+try:
+    from automations_cli.versions import NODE_ENGINES, NODE_MAJOR, NODE_TYPES_SPEC
+except ImportError:  # imported as a top-level module via sys.path.append
+    from versions import NODE_ENGINES, NODE_MAJOR, NODE_TYPES_SPEC
 
 
 def create_file(filepath: Path, content: str):
@@ -44,6 +48,15 @@ def create_backend(root: Path, project_name: str):
         "pydantic-settings>=2.0.0",
         "python-dotenv>=1.0.0",
     ]
+
+    [dependency-groups]
+    dev = [
+        "pytest>=8.0",
+        "httpx>=0.27",
+    ]
+
+    [tool.pytest.ini_options]
+    testpaths = ["tests"]
 
     [project.scripts]
     dev = "{package_name}.scripts:dev"
@@ -314,6 +327,26 @@ if __name__ == "__main__":
     '''
     create_file(src_app / "routers" / "health.py", routers_health_content)
 
+    # Sample test so `uv run pytest` (and CI's backend job) is green on day one
+    create_file(backend / "tests" / "test_health.py", f"""
+    from fastapi.testclient import TestClient
+
+    from {package_name}.main import app
+
+    client = TestClient(app)
+
+
+    def test_health_check():
+        response = client.get("/api/health")
+        assert response.status_code == 200
+        assert response.json()["status"] == "healthy"
+
+
+    def test_root():
+        response = client.get("/")
+        assert response.status_code == 200
+    """)
+
 
 def create_frontend(root: Path):
     """Create the React frontend with Vite, TypeScript, Tailwind CSS, and shadcn/ui."""
@@ -327,19 +360,24 @@ def create_frontend(root: Path):
     (frontend / "public").mkdir(parents=True, exist_ok=True)
 
     # package.json
-    create_file(frontend / "package.json", """
-    {
+    create_file(frontend / "package.json", f"""
+    {{
       "name": "frontend",
       "private": true,
       "version": "0.1.0",
       "type": "module",
-      "scripts": {
+      "engines": {{
+        "node": "{NODE_ENGINES}"
+      }},
+      "scripts": {{
         "dev": "vite",
         "build": "tsc -b && vite build",
         "lint": "eslint .",
-        "preview": "vite preview"
-      },
-      "dependencies": {
+        "preview": "vite preview",
+        "test": "vitest run",
+        "test:watch": "vitest"
+      }},
+      "dependencies": {{
         "react": "^18.3.1",
         "react-dom": "^18.3.1",
         "axios": "^1.7.0",
@@ -349,28 +387,33 @@ def create_frontend(root: Path):
         "lucide-react": "^0.395.0",
         "@radix-ui/react-slot": "^1.0.2",
         "tailwindcss-animate": "^1.0.7"
-      },
-      "devDependencies": {
-        "@types/node": "^20.14.0",
+      }},
+      "devDependencies": {{
+        "@testing-library/jest-dom": "^6.9.1",
+        "@testing-library/react": "^16.3.2",
+        "@types/node": "{NODE_TYPES_SPEC}",
         "@types/react": "^18.3.3",
         "@types/react-dom": "^18.3.0",
         "@typescript-eslint/eslint-plugin": "^7.13.0",
         "@typescript-eslint/parser": "^7.13.0",
-        "@vitejs/plugin-react-swc": "^3.7.0",
+        "@vitejs/plugin-react-swc": "^3.11.0",
         "autoprefixer": "^10.4.19",
         "eslint": "^8.57.0",
         "eslint-plugin-react-hooks": "^4.6.2",
         "eslint-plugin-react-refresh": "^0.4.7",
+        "jsdom": "^25.0.1",
         "postcss": "^8.4.38",
         "tailwindcss": "^3.4.4",
         "typescript": "^5.4.5",
-        "vite": "^5.3.1"
-      }
-    }
+        "vite": "^6.4.3",
+        "vitest": "^3.2.7"
+      }}
+    }}
     """)
 
     # vite.config.ts
     create_file(frontend / "vite.config.ts", """
+    /// <reference types="vitest/config" />
     import { defineConfig } from "vite";
     import react from "@vitejs/plugin-react-swc";
     import path from "path";
@@ -391,6 +434,41 @@ def create_frontend(root: Path):
           "@": path.resolve(__dirname, "./src"),
         },
       },
+      test: {
+        environment: "jsdom",
+        setupFiles: ["./src/test/setup.ts"],
+      },
+    });
+    """)
+
+    # vitest setup + a smoke test so `npm test` is green on day one
+    create_file(src / "test" / "setup.ts", """
+    import "@testing-library/jest-dom/vitest";
+    """)
+
+    create_file(src / "App.test.tsx", """
+    import { describe, expect, it, vi } from "vitest";
+    import { render, screen } from "@testing-library/react";
+    import App from "./App";
+
+    // Mock the API layer so the test never needs the backend running.
+    vi.mock("@/integrations/api", () => ({
+      healthApi: {
+        check: vi.fn().mockResolvedValue({
+          data: {
+            status: "healthy",
+            timestamp: new Date().toISOString(),
+            service: "FastAPI Backend",
+          },
+        }),
+      },
+    }));
+
+    describe("App", () => {
+      it("renders the health card", async () => {
+        render(<App />);
+        expect(await screen.findByText("FastAPI + React")).toBeInTheDocument();
+      });
     });
     """)
 
@@ -461,6 +539,25 @@ def create_frontend(root: Path):
       },
       "include": ["vite.config.ts"]
     }
+    """)
+
+    # .eslintrc.cjs — without it `npm run lint` fails with "no configuration"
+    create_file(frontend / ".eslintrc.cjs", """
+    module.exports = {
+      root: true,
+      env: { browser: true, es2020: true },
+      extends: [
+        'eslint:recommended',
+        'plugin:@typescript-eslint/recommended',
+        'plugin:react-hooks/recommended',
+      ],
+      ignorePatterns: ['dist'],
+      parser: '@typescript-eslint/parser',
+      plugins: ['react-refresh'],
+      rules: {
+        'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+      },
+    };
     """)
 
     # vite-env.d.ts
@@ -1022,142 +1119,10 @@ frontend/tsconfig.tsbuildinfo
 # Testing
 *.test.js.snap
 
-# Process ID files (from start.sh)
+# Process ID files (from ./dev)
 *.pids
 """
     create_file(root / ".gitignore", gitignore_content)
-
-
-def create_start_script(root: Path, project_name: str):
-    """Create start.sh script for running backend + frontend (adapted from exam-ace pattern)."""
-    package_name = project_name.replace("-", "_")
-
-    create_file(root / "start.sh", f"""
-    #!/bin/bash
-    # Root start script - runs both backend and frontend
-
-    echo "🚀 Starting {project_name}..."
-
-    # Job control on: each `&` background job gets its own process group, so
-    # `kill -PID` (below) reaches that job's whole subtree — e.g. uvicorn's
-    # --reload supervisor *and* its forked worker — instead of just the top
-    # process and orphaning the rest.
-    set -m
-
-    ROOT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
-    BACKEND_DIR="$ROOT_DIR/backend"
-    FRONTEND_DIR="$ROOT_DIR/frontend"
-
-    # ==================================
-    # Cleanup: Kill any existing processes (gracefully)
-    # ==================================
-    echo "🧹 Cleaning up existing processes..."
-
-    PID_FILE="$ROOT_DIR/.{package_name}.pids"
-    BACKEND_PID=""
-    FRONTEND_PID=""
-
-    # Signals the whole process group (PGID == PID for a `set -m` background
-    # job), not just the leader — so uvicorn's --reload supervisor and its
-    # forked worker both go down together.
-    graceful_kill() {{
-        local pid=$1
-        local name=$2
-        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
-            echo "   Sending SIGTERM to $name's process group (PGID: $pid)..."
-            kill -TERM -"$pid" 2>/dev/null
-            for i in 1 2 3 4 5; do
-                sleep 1
-                if ! kill -0 "$pid" 2>/dev/null; then
-                    echo "   ✓ $name stopped gracefully"
-                    return 0
-                fi
-            done
-            echo "   ⚠ Force-stopping $name's process group..."
-            kill -KILL -"$pid" 2>/dev/null
-        fi
-        return 0
-    }}
-
-    if [ -f "$PID_FILE" ]; then
-        source "$PID_FILE"
-        [ -n "$BACKEND_PID" ] && graceful_kill "$BACKEND_PID" "backend"
-        [ -n "$FRONTEND_PID" ] && graceful_kill "$FRONTEND_PID" "frontend"
-        rm -f "$PID_FILE"
-    fi
-
-    pkill -15 -f 'uvicorn.*{package_name}' 2>/dev/null
-    pkill -15 -f 'vite.*frontend' 2>/dev/null
-
-    sleep 1
-    echo "✅ Cleanup complete"
-    echo ""
-
-    # ==================================
-    # Start Docker services (if compose file exists)
-    # ==================================
-    if [ -f "$ROOT_DIR/docker-compose.yml" ]; then
-        echo "🐳 Starting Docker services..."
-        cd "$ROOT_DIR"
-        docker compose up -d
-        echo "✅ Docker services ready"
-        echo ""
-    fi
-
-    cleanup() {{
-        echo ""
-        echo "👋 Shutting down..."
-        graceful_kill "$BACKEND_PID" "backend"
-        graceful_kill "$FRONTEND_PID" "frontend"
-        # Backstop: catches anything that escaped its process group (e.g. a
-        # child that called setsid) so nothing is left holding port 8000/5173.
-        pkill -15 -f 'uvicorn.*{package_name}' 2>/dev/null
-        pkill -15 -f 'vite.*frontend' 2>/dev/null
-        if [ -f "$ROOT_DIR/docker-compose.yml" ]; then
-            cd "$ROOT_DIR" && docker compose down
-        fi
-        exit 0
-    }}
-
-    trap cleanup SIGINT SIGTERM
-
-    echo "📦 Starting backend..."
-    cd "$BACKEND_DIR"
-    uv run dev &
-    BACKEND_PID=$!
-    echo "✅ Backend running on http://localhost:8000"
-    echo ""
-
-    sleep 2
-
-    echo "🎨 Starting frontend..."
-    cd "$FRONTEND_DIR"
-    npm run dev &
-    FRONTEND_PID=$!
-    echo "✅ Frontend running on http://localhost:5173"
-    echo ""
-
-    cat > "$PID_FILE" << EOF
-    BACKEND_PID=$BACKEND_PID
-    FRONTEND_PID=$FRONTEND_PID
-    EOF
-
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "  Backend:  http://localhost:8000"
-    echo "  Frontend: http://localhost:5173"
-    echo "  API Docs: http://localhost:8000/docs"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo ""
-    echo "Press Ctrl+C to stop all servers"
-    echo ""
-
-    wait $BACKEND_PID $FRONTEND_PID
-    """)
-
-    # Make start.sh executable
-    start_script = root / "start.sh"
-    start_script.chmod(start_script.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-    print(f"[OK] Made executable: {start_script}")
 
 
 def create_docker_compose(root: Path, project_name: str):
@@ -1426,12 +1391,17 @@ Both servers support hot-reloading. Make changes to the code and see them reflec
 
 ## Next Steps
 
-- [ ] Set up database migrations (Alembic)
+- [ ] Set up database migrations (Alembic: `uv run alembic-init` in backend/)
 - [ ] Add authentication (JWT)
 - [ ] Configure environment variables for production
-- [ ] Add testing (pytest, vitest/jest)
-- [ ] Set up CI/CD pipeline
-- [ ] Configure Docker for deployment
+
+## Devops
+
+- `./dev` starts everything; subcommands manage the DB and backups
+- CI (.github/workflows/ci.yml) lints/tests/builds both sides on PRs and
+  publishes images to ghcr.io on main. It needs backend/uv.lock and
+  frontend/package-lock.json committed — both are bootstrapped at generation.
+- Node.js {NODE_MAJOR} is required (see frontend/package.json engines)
 """)
 
 
@@ -1476,20 +1446,16 @@ SECRET_KEY=your-secret-key-change-in-production
 DEBUG=True
 """)
 
-    if local:
-        # ./dev (no args) does what start.sh did, so they'd be redundant.
-        print("\n[DEVOPS] Creating dev/prod scripts and prod stack...")
-        # project_generator imports this module via sys.path.append rather than
-        # as a package member, so both import styles have to work.
-        try:
-            from automations_cli import local_deploy
-        except ImportError:
-            import local_deploy
+    print("\n[DEVOPS] Creating ./dev, CI workflow and Dockerfiles...")
+    # project_generator imports this module via sys.path.append rather than
+    # as a package member, so both import styles have to work.
+    try:
+        from automations_cli import local_deploy
+    except ImportError:
+        import local_deploy
 
-        local_deploy.scaffold_local(root, project_name)
-    else:
-        print("\n[SCRIPT] Creating start.sh...")
-        create_start_script(root, project_name)
+    local_deploy.scaffold_devops(root, project_name, flavor="react", local=local)
+    local_deploy.ensure_lockfiles(root, flavor="react")
 
     # Print success message
     print("\n" + "=" * 60)
@@ -1497,18 +1463,16 @@ DEBUG=True
     print("=" * 60)
     print(f"\n[LOCATION] Project location: {root.absolute()}")
     print("\n[GUIDE] Next steps:")
-    if local:
-        print(f"\n  ./dev")
-        print(f"     Starts PostgreSQL (Docker) + backend + frontend")
-        print(f"     Also: ./dev db-up | db-down | logs | status | backup | restore | nuke")
-        print(f"\n  ./prod deploy")
-        print(f"     LAN deploy over HTTPS. Copy .env.prod.example to .env.prod and fill it in first.")
+    print("\n  ./dev")
+    if compose:
+        print("     Starts PostgreSQL (Docker) + backend + frontend")
     else:
-        print(f"\n  ./start.sh")
-        if compose:
-            print(f"     Starts PostgreSQL (Docker) + backend + frontend")
-        else:
-            print(f"     Starts backend + frontend")
+        print("     Starts backend + frontend (SQLite)")
+    print("     Also: ./dev db-up | db-down | logs | status | backup | restore | nuke")
+    if local:
+        print("\n  ./prod deploy")
+        print("     LAN deploy over HTTPS. Copy .env.prod.example to .env.prod and fill it in first.")
+        print("     Also: ./prod build | pull | up | down | logs | status | backup | restore | offsite-sync | tls | nuke")
     print(f"\n  Or manually:")
     print(f"\n  1. Backend setup:")
     print(f"     cd backend")
