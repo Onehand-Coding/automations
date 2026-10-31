@@ -12,7 +12,7 @@ A Python CLI tool for automating development and file management tasks — proje
 - `generate-project --flutter` (FastAPI + Flutter frontend)
 - `--local` on both flavors (LAN prod stack); dev/prod parity checked by `~/Coding/projects/standards/scripts/check-deploy-parity.sh`
 - Ctrl+C clean exit (exit code 130) across all scripts
-- CI (`.github/workflows/ci.yml`) runs `pytest` on push/PR; ruff is scoped to `tests/` because `src/` has pre-existing lint debt
+- CI (`.github/workflows/ci.yml`) runs ruff check, ruff format check, and `pytest` on push/PR
 
 ### What's Broken / Needs Work
 - passlib bcrypt warning (`trapped error reading bcrypt version`) — harmless, but uses fallback backend
@@ -41,7 +41,7 @@ A Python CLI tool for automating development and file management tasks — proje
 - Node major pinned (not floating "latest"): reproducible builds across dev/CI/prod; breaking majors ship every ~6 months
 - Backend dev deps use PEP 735 `[dependency-groups]` to match pwdims/seniorhub (extras would break CI's plain `uv sync --frozen`)
 - Generated projects start with empty npm-audit allow-list; entries require written rationale in check-audit.cjs
-- CI gates on pytest plus ruff on tests only; cleaning up `src/` lint debt is deferred
+- CI gates on ruff check, ruff format check, and pytest across `src/` and `tests/`; `B008` and `E501` are ignored (Typer defaults and unwrappable strings)
 
 ### Relevant Files
 - `src/automations_cli/main.py` — Typer CLI entry
