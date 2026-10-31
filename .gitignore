@@ -4,6 +4,5 @@ __pycache__/
 resources/
 data/
 logs/
-tests/
 .venv/
 .env

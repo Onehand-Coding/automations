@@ -27,5 +27,14 @@ dependencies = [
 [project.scripts]
 automations = "automations_cli.main:app"
 
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.9",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/automations_cli"]
