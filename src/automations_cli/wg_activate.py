@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-import sys
-import time
 import logging
 import subprocess
+import sys
+import time
 from pathlib import Path
 
 from helper import setup_logging
@@ -46,13 +46,12 @@ class WireGuardActivator:
 
     def run_sudo_command(self, command, timeout=30, capture_output=True):
         """Run a sudo command with proper error handling."""
-        if not self.sudo_authenticated:
-            if not self.authenticate_sudo():
-                return None
+        if not self.sudo_authenticated and not self.authenticate_sudo():
+            return None
 
         try:
             # Use sudo -n to avoid password prompts (non-interactive)
-            sudo_command = ["sudo", "-n"] + command
+            sudo_command = ["sudo", "-n", *command]
             result = subprocess.run(
                 sudo_command, capture_output=capture_output, text=True, timeout=timeout
             )
@@ -79,9 +78,7 @@ class WireGuardActivator:
         self.logger.debug(f"Found {len(self.configs)} configuration files")
 
         if not self.configs:
-            warning_msg = (
-                f"No WireGuard configuration files found in '{self.config_dir}'"
-            )
+            warning_msg = f"No WireGuard configuration files found in '{self.config_dir}'"
             self.logger.warning(warning_msg)
             print(warning_msg)
             return False
@@ -112,9 +109,7 @@ class WireGuardActivator:
             )
             if result.returncode == 0:
                 if "UP" in result.stdout and "LOWER_UP" in result.stdout:
-                    self.logger.debug(
-                        f"Interface {interface_name} is UP via ip command"
-                    )
+                    self.logger.debug(f"Interface {interface_name} is UP via ip command")
                     return "🟡 UP (No WG Data)", None
                 elif "UP" in result.stdout:
                     return "🟠 UP (Link Down)", None
@@ -172,9 +167,7 @@ class WireGuardActivator:
         """Activate the selected WireGuard configuration."""
         interface_name = config_path.stem
 
-        self.logger.info(
-            f"Attempting to activate WireGuard interface: {interface_name}"
-        )
+        self.logger.info(f"Attempting to activate WireGuard interface: {interface_name}")
         print(f"\n🔄 Activating WireGuard interface: {interface_name}")
 
         # First, deactivate any currently active interfaces
@@ -257,9 +250,7 @@ class WireGuardActivator:
             if "ACTIVE" not in status and "UP" not in status:
                 continue
 
-            result = self.run_sudo_command(
-                ["wg-quick", "down", interface_name], timeout=20
-            )
+            result = self.run_sudo_command(["wg-quick", "down", interface_name], timeout=20)
             if result and result.returncode == 0:
                 success_msg = f"Deactivated {interface_name}"
                 self.logger.info(success_msg)
@@ -271,9 +262,7 @@ class WireGuardActivator:
                     print(f"⚠️  {interface_name} was not active or failed to deactivate")
 
         if not quiet:
-            print(
-                f"\n📊 Deactivation complete. {deactivated_count} interfaces deactivated."
-            )
+            print(f"\n📊 Deactivation complete. {deactivated_count} interfaces deactivated.")
 
     def show_status(self):
         """Show comprehensive status of all WireGuard interfaces."""
@@ -391,9 +380,7 @@ class WireGuardActivator:
                         else:
                             error_msg = f"Invalid choice: {choice_num}"
                             self.logger.warning(error_msg)
-                            print(
-                                f"❌ Please enter a number between 1 and {len(self.configs)}"
-                            )
+                            print(f"❌ Please enter a number between 1 and {len(self.configs)}")
                     except ValueError:
                         self.logger.warning(f"Invalid menu option: '{choice}'")
                         print("❌ Invalid option. Please try again.")
@@ -439,9 +426,7 @@ Examples:
         default="INFO",
         help="Set logging level (default: INFO)",
     )
-    parser.add_argument(
-        "--version", action="version", version="WireGuard Activator 2.1"
-    )
+    parser.add_argument("--version", action="version", version="WireGuard Activator 2.1")
 
     args = parser.parse_args()
 

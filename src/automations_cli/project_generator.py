@@ -1,20 +1,19 @@
 #!/usr/bin/env python3
+import argparse
 import os
+import subprocess
 import sys
 import venv
-import argparse
-import subprocess
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
-from helper import setup_logging, confirm
+from helper import confirm, setup_logging
 from helper.templates import (
-    LICENSE_TEMPLATES,
-    README_TEMPLATE,
-    PYPROJECT_TEMPLATE,
     GITIGNORE_TEMPLATE,
+    LICENSE_TEMPLATES,
+    PYPROJECT_TEMPLATE,
+    README_TEMPLATE,
 )
-
 
 DEFAULT_PROJECTS_DIR = os.path.join(
     os.getenv("DEFAULT_PROJECTS_DIR", os.path.expanduser("~/Coding")), "projects"
@@ -29,8 +28,7 @@ def check_uv_installed():
         subprocess.run(
             ["uv", "--version"],
             check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
         )
         return True
     except (subprocess.CalledProcessError, FileNotFoundError):
@@ -193,9 +191,9 @@ dependencies = []
 def create_license_file(license_type, author="Onehand-Coding"):
     """Create a LICENSE file using the template."""
     year = datetime.now().year
-    content = LICENSE_TEMPLATES.get(
-        license_type.upper(), LICENSE_TEMPLATES["MIT"]
-    ).format(year=year, author=author)
+    content = LICENSE_TEMPLATES.get(license_type.upper(), LICENSE_TEMPLATES["MIT"]).format(
+        year=year, author=author
+    )
     with open("LICENSE", "w") as f:
         f.write(content)
     logger.info(f"Created {license_type} LICENSE file.")
@@ -208,11 +206,11 @@ def create_readme(project_name, package_name, description, license_type):
     if Path("app.py").exists():
         usage_section = "## Usage\n\n```bash\npython app.py\n```"
     elif Path("src").exists() or Path(package_name).exists():
-        usage_section = f"## Usage\n\n```python\nimport {package_name}\n\n{package_name}.main.main()\n```"
-    else:
         usage_section = (
-            f"## Usage\n\n```bash\n# After installation\n{project_name}\n```"
+            f"## Usage\n\n```python\nimport {package_name}\n\n{package_name}.main.main()\n```"
         )
+    else:
+        usage_section = f"## Usage\n\n```bash\n# After installation\n{project_name}\n```"
 
     content = README_TEMPLATE.format(
         project_name=project_name,
@@ -239,11 +237,9 @@ def create_sublime_project(project_name, backend_in_subdir=False):
     project_path_abs = Path.cwd().as_posix()  # Use POSIX paths for consistency
 
     if backend_in_subdir:
-        venv_path = f"{project_path_abs}/backend/.venv"
         venv_bin = f"{project_path_abs}/backend/.venv/bin/python"
         venv_dir = f"{project_path_abs}/backend"
     else:
-        venv_path = f"{project_path_abs}/.venv"
         venv_bin = f"{project_path_abs}/.venv/bin/python"
         venv_dir = f"{project_path_abs}"
 
@@ -328,9 +324,7 @@ def init_git_repo(skip_git):
         return
     try:
         logger.info("Initializing Git repository...")
-        subprocess.run(
-            ["git", "init"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )
+        subprocess.run(["git", "init"], check=True, capture_output=True)
         logger.info("Git repository initialized.")
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         logger.error(f"Failed to initialize Git repository: {e}")
@@ -429,13 +423,9 @@ Examples:
         help="License type for documentation files (default: MIT)",
     )
     # Environment
-    parser.add_argument(
-        "--no-venv", action="store_true", help="Skip virtual environment creation"
-    )
+    parser.add_argument("--no-venv", action="store_true", help="Skip virtual environment creation")
     # Git
-    parser.add_argument(
-        "--no-git", action="store_true", help="Skip Git repository initialization"
-    )
+    parser.add_argument("--no-git", action="store_true", help="Skip Git repository initialization")
     # IDE
     parser.add_argument(
         "--open", "-o", action="store_true", help="Open in Sublime Text after creation"
@@ -457,9 +447,7 @@ Examples:
         args.description = prompt_if_missing(
             args.description, "Project description", default="Add your description here"
         )
-        args.author = prompt_if_missing(
-            args.author, "Author name", default="Onehand-Coding"
-        )
+        args.author = prompt_if_missing(args.author, "Author name", default="Onehand-Coding")
         args.email = prompt_if_missing(
             args.email, "Author email", default="onehand.coding433@gmail.com"
         )
@@ -506,9 +494,7 @@ Examples:
             == "y"
         )
         if not args.path:
-            args.path = prompt_if_missing(
-                None, "Project path", default=DEFAULT_PROJECTS_DIR
-            )
+            args.path = prompt_if_missing(None, "Project path", default=DEFAULT_PROJECTS_DIR)
 
     # Validate arguments
     validate_args(args)
@@ -525,23 +511,28 @@ Examples:
             # Add the current directory to path to import the fullstack module
             sys.path.append(os.path.dirname(__file__))
             import fullstack
-            full_project_path = (Path(args.path or DEFAULT_PROJECTS_DIR).expanduser() / project_name).resolve()
+
+            full_project_path = (
+                Path(args.path or DEFAULT_PROJECTS_DIR).expanduser() / project_name
+            ).resolve()
             full_project_path.mkdir(parents=True, exist_ok=True)
             os.chdir(full_project_path)
             fullstack.main(project_name, compose=args.compose, local=args.local)
-            
+
             # Create Sublime Text project files for fullstack projects too
             create_sublime_project(project_name, backend_in_subdir=True)
-            
+
             # Initialize Git repository for fullstack projects too
             init_git_repo(args.no_git)
-            
+
             # Optionally open in Sublime Text if requested
             if args.open:
                 open_in_sublime(str(full_project_path))
-            
-            logger.info(f"Fullstack project '{project_name}' created successfully at {full_project_path}")
-            
+
+            logger.info(
+                f"Fullstack project '{project_name}' created successfully at {full_project_path}"
+            )
+
             # Print next steps for fullstack
             logger.info("\nNext steps:")
             logger.info(f"1. cd {full_project_path}")
@@ -553,7 +544,7 @@ Examples:
             logger.info("   Backend: cd backend && uv sync && uv run dev")
             logger.info("   Frontend: cd frontend && npm install && npm run dev")
             logger.info("3. Open http://localhost:5173 in your browser")
-            
+
             sys.exit(0)
         except ImportError as e:
             logger.error(f"Failed to import fullstack module: {e}")
@@ -563,19 +554,24 @@ Examples:
         try:
             sys.path.append(os.path.dirname(__file__))
             import flutter
-            full_project_path = (Path(args.path or DEFAULT_PROJECTS_DIR).expanduser() / project_name).resolve()
+
+            full_project_path = (
+                Path(args.path or DEFAULT_PROJECTS_DIR).expanduser() / project_name
+            ).resolve()
             full_project_path.mkdir(parents=True, exist_ok=True)
             os.chdir(full_project_path)
             flutter.main(project_name, compose=args.compose, local=args.local)
-            
+
             create_sublime_project(project_name, backend_in_subdir=True)
             init_git_repo(args.no_git)
-            
+
             if args.open:
                 open_in_sublime(str(full_project_path))
-            
-            logger.info(f"Flutter project '{project_name}' created successfully at {full_project_path}")
-            
+
+            logger.info(
+                f"Flutter project '{project_name}' created successfully at {full_project_path}"
+            )
+
             logger.info("\nNext steps:")
             logger.info(f"1. cd {full_project_path}")
             if args.compose:
@@ -586,7 +582,7 @@ Examples:
             logger.info("   Backend: cd backend && uv sync && uv run dev")
             logger.info("   Frontend: cd frontend && flutter pub get && flutter run")
             logger.info("3. Open http://localhost:8000/docs for API docs")
-            
+
             sys.exit(0)
         except ImportError as e:
             logger.error(f"Failed to import flutter module: {e}")
@@ -596,10 +592,11 @@ Examples:
         project_path.mkdir(parents=True, exist_ok=True)
 
         full_project_path = project_path / project_name
-        if full_project_path.exists():
-            if not confirm(f"Directory '{full_project_path}' already exists. Overwrite?"):
-                logger.info("Project creation cancelled.")
-                sys.exit(0)
+        if full_project_path.exists() and not confirm(
+            f"Directory '{full_project_path}' already exists. Overwrite?"
+        ):
+            logger.info("Project creation cancelled.")
+            sys.exit(0)
 
         # Change to the project's parent directory, then create and move into it.
         os.chdir(project_path)
@@ -648,17 +645,13 @@ Examples:
         # Initialize Git repository
         init_git_repo(args.no_git)
 
-    logger.info(
-        f"\n✅ Project '{project_name}' created successfully at {full_project_path}"
-    )
+    logger.info(f"\n✅ Project '{project_name}' created successfully at {full_project_path}")
 
     # Print next steps
     logger.info("\nNext steps:")
     logger.info(f"1. cd {full_project_path}")
     if not args.no_docs and create_venv:
-        logger.info(
-            "2. source .venv/bin/activate  # On Windows: .venv\\Scripts\\activate"
-        )
+        logger.info("2. source .venv/bin/activate  # On Windows: .venv\\Scripts\\activate")
         if is_app:
             logger.info("3. python app.py")
         elif is_cli:

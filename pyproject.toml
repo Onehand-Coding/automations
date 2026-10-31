@@ -36,5 +36,16 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+# B008: Typer requires typer.Option()/typer.Argument() calls in defaults.
+# E501: long URLs and literal strings are not wrapped by ruff format.
+ignore = ["B008", "E501"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/automations_cli"]

@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-import sys
-import shutil
 import argparse
+import shutil
 import subprocess
+import sys
 from pathlib import Path
-from typing import Optional
 
 import pysrt
 
@@ -31,9 +30,7 @@ def sync_subtitle(video_path: Path, unsynced_srt: Path, output_srt: Path):
         print(errmsg, file=sys.stderr)
         return
 
-    logger.info(
-        f"Automatically syncing '{unsynced_srt.name}' with '{video_path.name}'."
-    )
+    logger.info(f"Automatically syncing '{unsynced_srt.name}' with '{video_path.name}'.")
 
     command = [
         "ffsubsync",
@@ -53,20 +50,18 @@ def sync_subtitle(video_path: Path, unsynced_srt: Path, output_srt: Path):
             command, check=True, capture_output=True, text=True, encoding="utf-8"
         )
         logger.info(result.stdout)
-        success_msg = (
-            f"✅ Successfully created synced subtitle file: '{output_srt.name}'"
-        )
+        success_msg = f"✅ Successfully created synced subtitle file: '{output_srt.name}'"
         logger.info(success_msg)
         print(success_msg)
 
     except subprocess.CalledProcessError as e:
-        logger.error(f"Failed to sync subtitles with ffsubsync.")
+        logger.error("Failed to sync subtitles with ffsubsync.")
         logger.error(f"STDOUT: {e.stdout}")
         logger.error(f"STDERR: {e.stderr}")
-        print(f"❌ Error syncing subtitles. Check logs for details.", file=sys.stderr)
+        print("❌ Error syncing subtitles. Check logs for details.", file=sys.stderr)
     except Exception as e:
         logger.error(f"An unexpected error occurred: {e}")
-        print(f"❌ An unexpected error occurred. Check logs.", file=sys.stderr)
+        print("❌ An unexpected error occurred. Check logs.", file=sys.stderr)
 
 
 def shift_subtitle(input_srt: Path, output_srt: Path, offset_seconds: float):
@@ -95,15 +90,13 @@ def shift_subtitle(input_srt: Path, output_srt: Path, offset_seconds: float):
         # 3. Save the modified subtitles to the new file
         subs.save(output_srt, encoding="utf-8")
 
-        success_msg = (
-            f"✅ Successfully created shifted subtitle file: '{output_srt.name}'"
-        )
+        success_msg = f"✅ Successfully created shifted subtitle file: '{output_srt.name}'"
         logger.info(success_msg)
         print(success_msg)
 
     except Exception as e:
         logger.error(f"Failed to shift subtitles: {e}")
-        print(f"❌ Error shifting subtitles. Check logs.", file=sys.stderr)
+        print("❌ Error shifting subtitles. Check logs.", file=sys.stderr)
 
 
 def embed_subtitle(
@@ -162,7 +155,7 @@ def embed_subtitle(
         )
 
     logger.debug(f"Executing command: {' '.join(command)}")
-    print(f"▶️  Running ffmpeg...")
+    print("▶️  Running ffmpeg...")
 
     try:
         subprocess.run(command, check=True)
@@ -171,7 +164,7 @@ def embed_subtitle(
         print(success_msg)
     except Exception as e:
         logger.error(f"Failed to embed subtitles: {e}")
-        print(f"❌ Error embedding subtitles. Check logs.", file=sys.stderr)
+        print("❌ Error embedding subtitles. Check logs.", file=sys.stderr)
 
 
 if __name__ == "__main__":
@@ -184,9 +177,7 @@ if __name__ == "__main__":
             "sync", help="Automatically sync a subtitle file with a video."
         )
         sync_parser.add_argument("video_path", help="Path to the video file.")
-        sync_parser.add_argument(
-            "input_srt", help="Path to the original (unsynced) .srt file."
-        )
+        sync_parser.add_argument("input_srt", help="Path to the original (unsynced) .srt file.")
         sync_parser.add_argument("output_srt", help="Path for the new, synced .srt file.")
 
         # --- Shift command ---
@@ -222,9 +213,7 @@ if __name__ == "__main__":
         args = parser.parse_args()
 
         if args.action == "sync":
-            sync_subtitle(
-                Path(args.video_path), Path(args.input_srt), Path(args.output_srt)
-            )
+            sync_subtitle(Path(args.video_path), Path(args.input_srt), Path(args.output_srt))
         elif args.action == "shift":
             shift_subtitle(Path(args.input_srt), Path(args.output_srt), args.offset)
         elif args.action == "embed":

@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
-import re
-import sys
-import json
-import shutil
 import argparse
-import subprocess
 import configparser
+import re
+import shutil
+import subprocess
+import sys
 from pathlib import Path
+from typing import Any, Optional
 from urllib.parse import urlparse
-from typing import Optional, Dict, Any
 
 try:
-    from helper.configs import setup_logging, CONFIG_DIR
+    from helper.configs import CONFIG_DIR, setup_logging
 except ImportError:
     from .helper.configs import setup_logging
 
@@ -29,7 +28,7 @@ DEFAULT_CONFIG = {
 }
 
 
-def load_config() -> Dict[str, Any]:
+def load_config() -> dict[str, Any]:
     """Load configuration from config file."""
     config = configparser.ConfigParser()
 
@@ -44,7 +43,7 @@ def load_config() -> Dict[str, Any]:
     return DEFAULT_CONFIG
 
 
-def save_config(config_dict: Dict[str, Any]):
+def save_config(config_dict: dict[str, Any]):
     """Save configuration to config file."""
     config = configparser.ConfigParser()
     config["settings"] = config_dict
@@ -89,9 +88,7 @@ def list_formats(url: str) -> bool:
         subprocess.run(command, check=True)
         return True
     except subprocess.CalledProcessError as e:
-        error_msg = (
-            f"Failed to list formats. yt-dlp exited with error code {e.returncode}."
-        )
+        error_msg = f"Failed to list formats. yt-dlp exited with error code {e.returncode}."
         logger.error(error_msg)
         print(f"❌ {error_msg}", file=sys.stderr)
         return False
@@ -102,12 +99,10 @@ def list_formats(url: str) -> bool:
         return False
 
 
-def parse_progress(line: str) -> Optional[Dict[str, str]]:
+def parse_progress(line: str) -> Optional[dict[str, str]]:
     """Parse yt-dlp progress output."""
     # Match download progress pattern
-    progress_pattern = (
-        r"\[download\]\s+(\d+\.?\d*)%\s+of\s+~?\s*([0-9.]+\w+)\s+at\s+([0-9.]+\w+/s)"
-    )
+    progress_pattern = r"\[download\]\s+(\d+\.?\d*)%\s+of\s+~?\s*([0-9.]+\w+)\s+at\s+([0-9.]+\w+/s)"
     match = re.search(progress_pattern, line)
 
     if match:
@@ -136,37 +131,23 @@ def handle_playlist_options(
     elif playlist_mode == "first_n" and not playlist_items:
         command.extend(["--playlist-end", "5"])
     elif playlist_mode == "download_all_video":
-        logger.info(
-            "Setting download mode to video (entire playlist as separate files)."
-        )
+        logger.info("Setting download mode to video (entire playlist as separate files).")
         # No special flags needed for video downloads
         pass
     elif playlist_mode == "items_video":
-        logger.info(
-            "Setting download mode to video (specific items as separate files)."
-        )
+        logger.info("Setting download mode to video (specific items as separate files).")
         # No special flags needed for video downloads
         pass
     elif playlist_mode == "audio_only":
         logger.info("Setting download mode to audio only (single video).")
         command.append("--no-playlist")
-        command.extend(
-            ["-f", "bestaudio/best", "--extract-audio", "--audio-format", "mp3"]
-        )
+        command.extend(["-f", "bestaudio/best", "--extract-audio", "--audio-format", "mp3"])
     elif playlist_mode == "download_all_audio":
-        logger.info(
-            "Setting download mode to audio only (entire playlist as separate files)."
-        )
-        command.extend(
-            ["-f", "bestaudio/best", "--extract-audio", "--audio-format", "mp3"]
-        )
+        logger.info("Setting download mode to audio only (entire playlist as separate files).")
+        command.extend(["-f", "bestaudio/best", "--extract-audio", "--audio-format", "mp3"])
     elif playlist_mode == "items_audio":
-        logger.info(
-            "Setting download mode to audio only (specific items as separate files)."
-        )
-        command.extend(
-            ["-f", "bestaudio/best", "--extract-audio", "--audio-format", "mp3"]
-        )
+        logger.info("Setting download mode to audio only (specific items as separate files).")
+        command.extend(["-f", "bestaudio/best", "--extract-audio", "--audio-format", "mp3"])
 
 
 def download(
@@ -268,7 +249,9 @@ def download(
             command.extend(["-S", "res,vbr,abr"])
         else:
             clean_quality = quality.removesuffix("p")
-            format_string = f"bestvideo[height<=?{clean_quality}]+bestaudio/best[height<=?{clean_quality}]/best"
+            format_string = (
+                f"bestvideo[height<=?{clean_quality}]+bestaudio/best[height<=?{clean_quality}]/best"
+            )
             command.extend(["-f", format_string])
 
     command.append(url)
@@ -352,16 +335,14 @@ def is_playlist_url(url: str) -> bool:
         )
         ids = [line for line in result.stdout.strip().splitlines() if line]
         return len(ids) > 1
-    except Exception as e:
+    except Exception:
         # If yt-dlp fails, assume not a playlist
         return False
 
 
 if __name__ == "__main__":
     try:
-        parser = argparse.ArgumentParser(
-            description="Enhanced yt-dlp video downloader wrapper."
-        )
+        parser = argparse.ArgumentParser(description="Enhanced yt-dlp video downloader wrapper.")
         parser.add_argument("url", nargs="?", help="The URL of the video to download.")
         parser.add_argument(
             "output_name", nargs="?", default=None, help="Optional output filename."

@@ -1,28 +1,27 @@
 #!/usr/bin/env python3
-import os
-import sys
+import argparse
 import json
+import os
 import pickle
 import shutil
 import smtplib
-import argparse
 import subprocess
-from pathlib import Path
+import sys
 from datetime import datetime
-from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from pathlib import Path
 
 from dotenv import load_dotenv
-
 from helper import DATA_DIR, setup_logging
 
 # --- Google Drive Upload Imports ---
 try:
+    from google.auth.transport.requests import Request
+    from google.oauth2.credentials import Credentials  # noqa: F401
+    from google_auth_oauthlib.flow import InstalledAppFlow
     from googleapiclient.discovery import build
     from googleapiclient.http import MediaFileUpload
-    from google_auth_oauthlib.flow import InstalledAppFlow
-    from google.auth.transport.requests import Request
-    from google.oauth2.credentials import Credentials
 
     GOOGLE_LIBS_AVAILABLE = True
 except ImportError:
@@ -51,7 +50,9 @@ def check_rclone():
     """Checks if rclone exists and returns path or None."""
     rclone_path = shutil.which("rclone")
     if not rclone_path:
-        error_msg = "rclone command not found. Please install rclone and ensure it's in your system's PATH."
+        error_msg = (
+            "rclone command not found. Please install rclone and ensure it's in your system's PATH."
+        )
         logger.error(error_msg)
         return None
     return rclone_path
@@ -64,9 +65,7 @@ def download_latest_from_rclone(rclone_remote_name, remote_dir_name, local_dest_
     )
     rclone_path = check_rclone()
     if not rclone_path:
-        send_notification(
-            "rclone Restore Failed", "rclone not found, cannot check remote."
-        )
+        send_notification("rclone Restore Failed", "rclone not found, cannot check remote.")
         return None
 
     remote_path = f"{rclone_remote_name}:{remote_dir_name}"
@@ -82,9 +81,7 @@ def download_latest_from_rclone(rclone_remote_name, remote_dir_name, local_dest_
         dump_files = [f for f in files_json if f.get("Name", "").endswith(".dump")]
 
         if not dump_files:
-            logger.warning(
-                f"No .dump files found in rclone remote directory '{remote_path}'."
-            )
+            logger.warning(f"No .dump files found in rclone remote directory '{remote_path}'.")
             return None
 
         # Find the latest file based on ModTime
@@ -119,9 +116,7 @@ def download_latest_from_rclone(rclone_remote_name, remote_dir_name, local_dest_
         )
         logger.debug("rclone download stdout:\n---\n%s\n---", dl_result.stdout.strip())
         if dl_result.stderr:
-            logger.debug(
-                "rclone download stderr:\n---\n%s\n---", dl_result.stderr.strip()
-            )
+            logger.debug("rclone download stderr:\n---\n%s\n---", dl_result.stderr.strip())
         return str(local_file_path)
 
     except json.JSONDecodeError as e:
@@ -135,12 +130,8 @@ def download_latest_from_rclone(rclone_remote_name, remote_dir_name, local_dest_
         send_notification("rclone Restore Failed", error_details)
         return None
     except Exception as e:
-        logger.exception(
-            "An unexpected error occurred during rclone latest backup check/download."
-        )
-        send_notification(
-            "rclone Restore Failed (Unexpected)", f"Error: {e}\nCheck logs."
-        )
+        logger.exception("An unexpected error occurred during rclone latest backup check/download.")
+        send_notification("rclone Restore Failed (Unexpected)", f"Error: {e}\nCheck logs.")
         return None
 
 
@@ -189,9 +180,7 @@ def upload_backup_with_rclone(
         return False
     except Exception as e:
         logger.exception("An unexpected error occurred during rclone upload.")
-        send_notification(
-            "Upload FAILED (rclone - unexpected)", f"Error: {e}\nCheck logs."
-        )
+        send_notification("Upload FAILED (rclone - unexpected)", f"Error: {e}\nCheck logs.")
         return False
 
 
@@ -199,9 +188,7 @@ def upload_backup_with_rclone(
 def upload_to_gdrive(local_file_path, target_filename=None):
     """Uploads the backup file directly to Google Drive root."""
     if not GOOGLE_LIBS_AVAILABLE:
-        logger.error(
-            "Google API libraries not installed. Cannot upload to Google Drive."
-        )
+        logger.error("Google API libraries not installed. Cannot upload to Google Drive.")
         logger.error(
             "Install them using: pip install google-api-python-client google-auth-oauthlib google-auth-httplib2"
         )
@@ -211,14 +198,10 @@ def upload_to_gdrive(local_file_path, target_filename=None):
     local_file_path = Path(local_file_path)
     if not local_file_path.is_file():
         logger.error(f"GDrive Upload Failed: Local file not found at {local_file_path}")
-        send_notification(
-            "Upload FAILED (GDrive)", f"Local file not found: {local_file_path.name}"
-        )
+        send_notification("Upload FAILED (GDrive)", f"Local file not found: {local_file_path.name}")
         return False
 
-    logger.info(
-        f"Attempting upload via Google Drive API for file: {local_file_path.name}"
-    )
+    logger.info(f"Attempting upload via Google Drive API for file: {local_file_path.name}")
     creds = None
 
     # --- Credential Handling (from gdrive_uploader.py) ---
@@ -248,9 +231,7 @@ def upload_to_gdrive(local_file_path, target_filename=None):
                 logger.error(
                     f"GDrive authentication required, but credentials file not found at '{GDRIVE_CREDS_FILE}'"
                 )
-                send_notification(
-                    "Upload FAILED (GDrive)", "GDrive credentials.json missing."
-                )
+                send_notification("Upload FAILED (GDrive)", "GDrive credentials.json missing.")
                 return False
             try:
                 logger.info(
@@ -272,9 +253,7 @@ def upload_to_gdrive(local_file_path, target_filename=None):
                 print("Please visit this URL on any device with a browser:")
                 print(auth_url)
                 # Prompt user for the authorization code interactively
-                code = input(
-                    "Enter the authorization code obtained from the URL: "
-                ).strip()
+                code = input("Enter the authorization code obtained from the URL: ").strip()
 
                 if not code:
                     logger.error(
@@ -291,20 +270,12 @@ def upload_to_gdrive(local_file_path, target_filename=None):
                 creds = flow.credentials
                 logger.info("✓ Successfully obtained GDrive credentials.")
             except FileNotFoundError:
-                logger.error(
-                    f"GDrive credentials file not found at: {GDRIVE_CREDS_FILE}"
-                )
-                send_notification(
-                    "Upload FAILED (GDrive)", "credentials.json not found."
-                )
+                logger.error(f"GDrive credentials file not found at: {GDRIVE_CREDS_FILE}")
+                send_notification("Upload FAILED (GDrive)", "credentials.json not found.")
                 return False
             except Exception as e:
-                logger.error(
-                    f"An error occurred during GDrive authentication flow: {e}"
-                )
-                send_notification(
-                    "Upload FAILED (GDrive)", f"Authentication error: {e}"
-                )
+                logger.error(f"An error occurred during GDrive authentication flow: {e}")
+                send_notification("Upload FAILED (GDrive)", f"Authentication error: {e}")
                 return False
 
         # Save the credentials for the next run
@@ -326,9 +297,7 @@ def upload_to_gdrive(local_file_path, target_filename=None):
         )  # static_discovery=False can help sometimes
 
         # Prepare file metadata and media body
-        file_metadata = {
-            "name": target_filename if target_filename else local_file_path.name
-        }
+        file_metadata = {"name": target_filename if target_filename else local_file_path.name}
         logger.info(f"Preparing to upload '{file_metadata['name']}'...")
         media = MediaFileUpload(str(local_file_path), resumable=True)
 
@@ -355,9 +324,7 @@ def upload_to_gdrive(local_file_path, target_filename=None):
 
     except Exception as e:
         logger.exception("An unexpected error occurred during Google Drive upload")
-        send_notification(
-            "Upload FAILED (GDrive - unexpected)", f"Error: {e}\nCheck logs."
-        )
+        send_notification("Upload FAILED (GDrive - unexpected)", f"Error: {e}\nCheck logs.")
         return False
 
 
@@ -385,7 +352,9 @@ def create_backup(db_url, backup_dir=BACKUP_DB_DIR):
             logger.debug("pg_dump stdout:\n---\n%s\n---", result.stdout.strip())
         return str(backup_file)
     except subprocess.CalledProcessError as e:
-        error_details = f"pg_dump Error:\nReturn Code: {e.returncode}\nStderr: {e.stderr}\nStdout: {e.stdout}"
+        error_details = (
+            f"pg_dump Error:\nReturn Code: {e.returncode}\nStderr: {e.stderr}\nStdout: {e.stdout}"
+        )
         logger.error(f"Backup FAILED.\n{error_details}")
         send_notification("Backup FAILED", error_details)
         return None
@@ -464,9 +433,7 @@ def send_notification(subject, body):
     smtp_pass = os.getenv("SMTP_PASSWORD")
 
     if not all([sender, recipient, smtp_server, smtp_user, smtp_pass]):
-        logger.warning(
-            "Email notification skipped: Missing required environment variables."
-        )
+        logger.warning("Email notification skipped: Missing required environment variables.")
         return
     try:
         smtp_port = int(smtp_port_str)
@@ -485,9 +452,7 @@ def send_notification(subject, body):
             server.send_message(msg)
         logger.info("✓ Notification email sent successfully.")
     except smtplib.SMTPAuthenticationError:
-        logger.error(
-            "Failed to send email: SMTP Authentication failed. Check credentials."
-        )
+        logger.error("Failed to send email: SMTP Authentication failed. Check credentials.")
     except Exception:
         logger.exception("Failed to send email due to an unexpected error.")
 
@@ -498,9 +463,7 @@ def main():
         description="PostgreSQL Backup/Restore Tool with Cloud Upload Options",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument(
-        "action", choices=["backup", "restore", "list"], help="Action to perform"
-    )
+    parser.add_argument("action", choices=["backup", "restore", "list"], help="Action to perform")
     parser.add_argument(
         "--db-url",
         help="Database connection string/URL (REQUIRED for restore, overrides DB_URL in .env for backup)",
@@ -558,18 +521,14 @@ def main():
         backup_file_path = create_backup(db_url, local_backup_dir)
 
         if backup_file_path and args.upload:
-            logger.info(
-                f"Backup successful, proceeding with upload via '{args.upload_method}'..."
-            )
+            logger.info(f"Backup successful, proceeding with upload via '{args.upload_method}'...")
 
             upload_successful = False
             upload_details = {}
 
             if args.upload_method == "rclone":
                 # --- Rclone Upload ---
-                rclone_remote_name = args.rclone_remote or os.getenv(
-                    "RCLONE_REMOTE_NAME"
-                )
+                rclone_remote_name = args.rclone_remote or os.getenv("RCLONE_REMOTE_NAME")
                 if not rclone_remote_name:
                     logger.error(
                         "rclone upload requested but no remote name provided. Use --rclone-remote or set RCLONE_REMOTE_NAME in .env."
@@ -616,7 +575,9 @@ def main():
                     )
                     size_str = "Unknown size"
 
-                notification_subject = f"Backup Successful & Uploaded ({upload_details.get('Method', 'Unknown')})"
+                notification_subject = (
+                    f"Backup Successful & Uploaded ({upload_details.get('Method', 'Unknown')})"
+                )
                 notification_body = (
                     f"Backup created and uploaded.\n\n"
                     f"File: {os.path.basename(backup_file_path)}\n"
@@ -664,9 +625,7 @@ def main():
                 target_backup_path = str(provided_path)
             else:
                 target_backup_path = str(local_backup_dir / args.backup_file)
-            logger.info(
-                f"Attempting to restore specific backup file: {target_backup_path}"
-            )
+            logger.info(f"Attempting to restore specific backup file: {target_backup_path}")
             if not Path(target_backup_path).is_file():
                 logger.error(f"Specified backup file not found: {target_backup_path}")
                 send_notification(
@@ -692,9 +651,7 @@ def main():
                 )
                 if backups:
                     latest_local_backup = backups[0]
-                    logger.info(
-                        f"Found latest local backup: {latest_local_backup.name}"
-                    )
+                    logger.info(f"Found latest local backup: {latest_local_backup.name}")
                     try:
                         confirm = (
                             input(
@@ -716,23 +673,15 @@ def main():
 
             if not target_backup_path:  # If no local found or user didn't confirm local
                 if not latest_local_backup:  # Only log this if local wasn't even found
-                    logger.info(
-                        f"No suitable local backup found in '{local_backup_dir}'."
-                    )
+                    logger.info(f"No suitable local backup found in '{local_backup_dir}'.")
 
                 # Check if rclone remote is configured for potential download
-                rclone_remote_name = args.rclone_remote or os.getenv(
-                    "RCLONE_REMOTE_NAME"
-                )
+                rclone_remote_name = args.rclone_remote or os.getenv("RCLONE_REMOTE_NAME")
                 if not rclone_remote_name:
-                    logger.info(
-                        "No rclone remote configured, cannot check for remote backups."
-                    )
+                    logger.info("No rclone remote configured, cannot check for remote backups.")
                 else:
                     try:
-                        rclone_target_dir = (
-                            args.rclone_target_dir
-                        )  # Use the arg value directly
+                        rclone_target_dir = args.rclone_target_dir  # Use the arg value directly
                         confirm_remote = (
                             input(
                                 f"Try downloading latest backup from rclone remote '{rclone_remote_name}:{rclone_target_dir}'? (y/N): "
@@ -748,9 +697,7 @@ def main():
                             )
                             if downloaded_path:
                                 target_backup_path = downloaded_path
-                                logger.info(
-                                    f"Will restore downloaded backup: {target_backup_path}"
-                                )
+                                logger.info(f"Will restore downloaded backup: {target_backup_path}")
                             else:
                                 logger.error(
                                     "Failed to find or download latest backup from rclone remote."
@@ -782,11 +729,7 @@ def main():
         logger.info(f"Listing local backups in directory: '{local_backup_dir}'")
         if local_backup_dir.exists() and local_backup_dir.is_dir():
             backups = sorted(
-                [
-                    f
-                    for f in local_backup_dir.iterdir()
-                    if f.is_file() and f.name.endswith(".dump")
-                ],
+                [f for f in local_backup_dir.iterdir() if f.is_file() and f.name.endswith(".dump")],
                 key=lambda f: f.stat().st_mtime,
                 reverse=True,
             )
@@ -804,14 +747,10 @@ def main():
                     mtime = datetime.fromtimestamp(backup.stat().st_mtime).strftime(
                         "%Y-%m-%d %H:%M:%S"
                     )
-                    list_output.append(
-                        f"  {i}. {backup.name} ({size_mb:.2f} MB, {mtime})"
-                    )
+                    list_output.append(f"  {i}. {backup.name} ({size_mb:.2f} MB, {mtime})")
                 except Exception as e:
                     list_output.append(f"  {i}. Error listing {backup.name}: {e}")
-                    logger.warning(
-                        f"Error getting details for backup {backup.name}: {e}"
-                    )
+                    logger.warning(f"Error getting details for backup {backup.name}: {e}")
             print("\n".join(list_output))
             # TODO: Add optional listing from rclone/gdrive if desired
         else:

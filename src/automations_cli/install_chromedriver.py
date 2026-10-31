@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-import os
-import re
-import sys
-import json
-import shutil
-import logging
-import zipfile
-import platform
 import argparse
-import tempfile
+import json
+import logging
+import os
+import platform
+import re
+import shutil
 import subprocess
+import sys
+import tempfile
 import urllib.request
-from typing import Optional
+import zipfile
+from typing import ClassVar, Optional
 
 from helper import setup_logging
 
@@ -25,7 +25,7 @@ class ChromeDriverInstaller:
     METADATA_URL = "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json"
 
     # Map of operating systems to Chrome for Testing platform names
-    PLATFORM_MAP = {
+    PLATFORM_MAP: ClassVar[dict] = {
         "linux": "linux64",
         "darwin": "mac-x64" if platform.machine() != "arm64" else "mac-arm64",
         "win32": "win32",
@@ -33,7 +33,7 @@ class ChromeDriverInstaller:
     }
 
     # Browser executable names by platform and browser type
-    BROWSER_EXECUTABLES = {
+    BROWSER_EXECUTABLES: ClassVar[dict] = {
         "linux": {
             "chrome": ["google-chrome", "chrome"],
             "brave": ["brave-browser"],
@@ -95,11 +95,9 @@ class ChromeDriverInstaller:
         # Set installation paths based on platform
         if self.system.startswith("win"):
             self.installation_path = os.path.join(
-                os.environ.get("ProgramFiles", "C:\\Program Files"), "ChromeDriver"
+                os.environ.get("PROGRAMFILES", "C:\\Program Files"), "ChromeDriver"
             )
-            self.executable_path = os.path.join(
-                self.installation_path, "chromedriver.exe"
-            )
+            self.executable_path = os.path.join(self.installation_path, "chromedriver.exe")
         else:
             self.installation_path = "/usr/local/bin"
             self.executable_path = os.path.join(self.installation_path, "chromedriver")
@@ -114,9 +112,7 @@ class ChromeDriverInstaller:
         Returns:
             Browser version string or None if not detected
         """
-        executables = self.BROWSER_EXECUTABLES.get(self.system, {}).get(
-            self.browser, []
-        )
+        executables = self.BROWSER_EXECUTABLES.get(self.system, {}).get(self.browser, [])
         if not executables:
             logger.error(f"Unsupported browser '{self.browser}' on {self.system}")
             return None
@@ -207,17 +203,11 @@ class ChromeDriverInstaller:
             return False
 
         base_url = "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing"
-        zip_url = (
-            f"{base_url}/{version}/{platform_name}/chromedriver-{platform_name}.zip"
-        )
+        zip_url = f"{base_url}/{version}/{platform_name}/chromedriver-{platform_name}.zip"
 
         if self.dry_run:
-            logger.info(
-                f"[DRY RUN] Would download ChromeDriver {version} from {zip_url}"
-            )
-            logger.info(
-                f"[DRY RUN] Would install ChromeDriver to {self.executable_path}"
-            )
+            logger.info(f"[DRY RUN] Would download ChromeDriver {version} from {zip_url}")
+            logger.info(f"[DRY RUN] Would install ChromeDriver to {self.executable_path}")
             return True
 
         logger.info(f"Downloading ChromeDriver {version} from {zip_url}")
@@ -239,23 +229,19 @@ class ChromeDriverInstaller:
                 else:
                     chromedriver_name = "chromedriver"
 
-                chromedriver_dir = os.path.join(
-                    temp_dir, f"chromedriver-{platform_name}"
-                )
+                chromedriver_dir = os.path.join(temp_dir, f"chromedriver-{platform_name}")
                 chromedriver_path = os.path.join(chromedriver_dir, chromedriver_name)
 
                 # Check if the file exists
                 if not os.path.exists(chromedriver_path):
                     # Look for it in subdirectories
-                    for root, dirs, files in os.walk(temp_dir):
+                    for root, _dirs, files in os.walk(temp_dir):
                         if chromedriver_name in files:
                             chromedriver_path = os.path.join(root, chromedriver_name)
                             break
 
                 if not os.path.exists(chromedriver_path):
-                    logger.error(
-                        f"Could not find {chromedriver_name} in the downloaded archive"
-                    )
+                    logger.error(f"Could not find {chromedriver_name} in the downloaded archive")
                     return False
 
                 # Make sure the executable has the right permissions
@@ -300,9 +286,7 @@ class ChromeDriverInstaller:
                 result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
                 if result.returncode == 0:
                     chromedriver_version = result.stdout.strip()
-                    match = re.search(
-                        r"ChromeDriver (\d+\.\d+\.\d+)", chromedriver_version
-                    )
+                    match = re.search(r"ChromeDriver (\d+\.\d+\.\d+)", chromedriver_version)
                     if match:
                         driver_major = match.group(1).split(".")[0]
                         browser_version = self.get_browser_version()
@@ -381,9 +365,7 @@ def main():
 
     # Check for root privileges on Unix-like systems
     if not args.dry_run and platform.system() != "Windows" and os.geteuid() != 0:
-        logger.error(
-            "Please run this script with sudo: `sudo python3 install_chromedriver.py`"
-        )
+        logger.error("Please run this script with sudo: `sudo python3 install_chromedriver.py`")
         return 1
 
     if args.dry_run:

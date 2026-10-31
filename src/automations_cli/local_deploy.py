@@ -1139,14 +1139,14 @@ def scaffold_devops(root: Path, project_name: str, flavor: str = "react", local:
     flavor: "react" (npm/vite frontend) or "flutter" (flutter run frontend).
     """
     if flavor == "react":
-        dev_script = DEV_SCRIPT.replace(
-            "__FRONTEND_CMD__", "npm run dev"
-        ).replace("__FRONTEND_PKILL__", "vite.*frontend")
+        dev_script = DEV_SCRIPT.replace("__FRONTEND_CMD__", "npm run dev").replace(
+            "__FRONTEND_PKILL__", "vite.*frontend"
+        )
         ci_workflow = CI_WORKFLOW_REACT
     elif flavor == "flutter":
-        dev_script = DEV_SCRIPT.replace(
-            "__FRONTEND_CMD__", "flutter run -d chrome"
-        ).replace("__FRONTEND_PKILL__", "flutter_tools")
+        dev_script = DEV_SCRIPT.replace("__FRONTEND_CMD__", "flutter run -d chrome").replace(
+            "__FRONTEND_PKILL__", "flutter_tools"
+        )
         ci_workflow = CI_WORKFLOW_FLUTTER
     else:
         raise ValueError(f"Unknown flavor: {flavor!r} (expected 'react' or 'flutter')")
@@ -1199,8 +1199,10 @@ def ensure_lockfiles(root: Path, flavor: str = "react"):
     if subprocess.run(["uv", "lock"], cwd=backend, capture_output=True).returncode == 0:
         print("[OK] Created: backend/uv.lock")
     else:
-        print("[WARN] Could not create backend/uv.lock (uv missing or offline?). "
-              "Run `uv lock` in backend/ before pushing.")
+        print(
+            "[WARN] Could not create backend/uv.lock (uv missing or offline?). "
+            "Run `uv lock` in backend/ before pushing."
+        )
 
     if flavor == "react":
         frontend = root / "frontend"
@@ -1212,14 +1214,21 @@ def ensure_lockfiles(root: Path, flavor: str = "react"):
         if result.returncode == 0:
             print("[OK] Created: frontend/package-lock.json")
         else:
-            print("[WARN] Could not create frontend/package-lock.json (npm missing or offline?). "
-                  "Run `npm install` in frontend/ before pushing.")
+            print(
+                "[WARN] Could not create frontend/package-lock.json (npm missing or offline?). "
+                "Run `npm install` in frontend/ before pushing."
+            )
 
 
 def _update_gitignore(root: Path, project_name: str):
     """Real secrets and generated certs must never be committed."""
     gitignore = root / ".gitignore"
-    additions = [".env.prod", "frontend/certs/", "backups/", f".{project_name.replace('-', '_')}.pids"]
+    additions = [
+        ".env.prod",
+        "frontend/certs/",
+        "backups/",
+        f".{project_name.replace('-', '_')}.pids",
+    ]
     existing = gitignore.read_text(encoding="utf-8") if gitignore.exists() else ""
     missing = [entry for entry in additions if entry not in existing.split()]
     if missing:

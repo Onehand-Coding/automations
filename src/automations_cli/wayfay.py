@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
-import re
-import sys
 import platform
+import re
 import subprocess
+import sys
 from pathlib import Path
-from typing import List, Dict
 
-from helper import write_to_json, read_print_json, DATA_DIR
+from helper import DATA_DIR, read_print_json, write_to_json
 
 
-def get_ssids() -> List[str]:
+def get_ssids() -> list[str]:
     """Get list of SSIDs of previous and present wifi connections of the device.
     Returns:
         List of SSIDs found in the system
@@ -37,11 +36,7 @@ def get_ssids() -> List[str]:
                 check=True,
             )
             # Extract SSIDs from airport output (skipping header line)
-            ssids = [
-                line.split()[0]
-                for line in result.stdout.splitlines()[1:]
-                if line.strip()
-            ]
+            ssids = [line.split()[0] for line in result.stdout.splitlines()[1:] if line.strip()]
         elif system == "Linux":
             # Try nmcli first (most modern Linux distros)
             try:
@@ -73,7 +68,7 @@ def get_ssids() -> List[str]:
         return []
 
 
-def get_passwords(ssids: List[str]) -> List[Dict[str, str]]:
+def get_passwords(ssids: list[str]) -> list[dict[str, str]]:
     """Get passwords for each SSID.
     Args:
         ssids: List of SSIDs to retrieve passwords for
@@ -95,9 +90,7 @@ def get_passwords(ssids: List[str]) -> List[Dict[str, str]]:
                     check=False,
                 )
                 password_match = re.search(r"Key Content\s+:\s+(.*)", result.stdout)
-                wifi_info["Password"] = (
-                    password_match.group(1) if password_match else "No password"
-                )
+                wifi_info["Password"] = password_match.group(1) if password_match else "No password"
 
             elif system == "Darwin":  # macOS
                 # macOS stores passwords in Keychain
@@ -139,14 +132,10 @@ def get_passwords(ssids: List[str]) -> List[Dict[str, str]]:
                             content = wifi_path.read_text()
                             password_match = re.search(r"psk=(.*)", content)
                             wifi_info["Password"] = (
-                                password_match.group(1)
-                                if password_match
-                                else "No password"
+                                password_match.group(1) if password_match else "No password"
                             )
                         except Exception:
-                            wifi_info["Password"] = (
-                                "Password exists but couldn't be read"
-                            )
+                            wifi_info["Password"] = "Password exists but couldn't be read"
                     else:
                         wifi_info["Password"] = "No password"
 
@@ -165,7 +154,7 @@ def get_passwords(ssids: List[str]) -> List[Dict[str, str]]:
     return wifi_list
 
 
-def save_wifi_data(wifi_data: List[Dict[str, str]], output_file: Path) -> None:
+def save_wifi_data(wifi_data: list[dict[str, str]], output_file: Path) -> None:
     """Save wifi data to a JSON file.
     Args:
         wifi_data: List of dictionaries containing SSID and password pairs

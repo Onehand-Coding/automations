@@ -5,16 +5,14 @@ Automates fullstack project creation with a FastAPI backend and Flutter frontend
 Based on patterns from docdesk (Flutter) and fullstack.py (generator architecture).
 """
 
-import os
-import sys
-from pathlib import Path
 import textwrap
+from pathlib import Path
 
 
 def create_file(filepath: Path, content: str):
     """Create a file with the given content, creating parent directories if needed."""
     filepath.parent.mkdir(parents=True, exist_ok=True)
-    filepath.write_text(textwrap.dedent(content).strip() + "\n", encoding='utf-8')
+    filepath.write_text(textwrap.dedent(content).strip() + "\n", encoding="utf-8")
     print(f"[OK] Created: {filepath}")
 
 
@@ -25,7 +23,9 @@ def create_backend(root: Path, project_name: str):
     src_app = backend / "src" / package_name
 
     # pyproject.toml
-    create_file(backend / "pyproject.toml", f"""
+    create_file(
+        backend / "pyproject.toml",
+        f"""
     [build-system]
     requires = ["hatchling"]
     build-backend = "hatchling.build"
@@ -67,24 +67,33 @@ def create_backend(root: Path, project_name: str):
 
     [tool.hatch.build.targets.wheel]
     packages = ["src/{package_name}"]
-    """)
+    """,
+    )
 
     # .env
-    create_file(backend / ".env", f"""
+    create_file(
+        backend / ".env",
+        f"""
     DATABASE_URL=sqlite+aiosqlite:///./{project_name}.db
     SECRET_KEY=change-me-to-a-random-secret-key
     ALGORITHM=HS256
     ACCESS_TOKEN_EXPIRE_MINUTES=480
     DEBUG=True
-    """)
+    """,
+    )
 
     # src/{package_name}/__init__.py
-    create_file(src_app / "__init__.py", """
+    create_file(
+        src_app / "__init__.py",
+        """
     __version__ = "0.1.0"
-    """)
+    """,
+    )
 
     # src/{package_name}/main.py
-    create_file(src_app / "main.py", f"""
+    create_file(
+        src_app / "main.py",
+        f"""
     from contextlib import asynccontextmanager
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
@@ -132,10 +141,13 @@ def create_backend(root: Path, project_name: str):
     @app.get("/")
     async def root():
         return {{"message": "{project_name} API", "version": "0.1.0"}}
-    """)
+    """,
+    )
 
     # src/{package_name}/config.py
-    create_file(src_app / "config.py", f"""
+    create_file(
+        src_app / "config.py",
+        f"""
     from pydantic_settings import BaseSettings, SettingsConfigDict
 
     class Settings(BaseSettings):
@@ -148,10 +160,13 @@ def create_backend(root: Path, project_name: str):
         model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
 
     settings = Settings()
-    """)
+    """,
+    )
 
     # src/{package_name}/database.py
-    create_file(src_app / "database.py", f"""
+    create_file(
+        src_app / "database.py",
+        f"""
     from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
     from sqlalchemy.orm import DeclarativeBase
 
@@ -171,10 +186,13 @@ def create_backend(root: Path, project_name: str):
             except Exception:
                 await session.rollback()
                 raise
-    """)
+    """,
+    )
 
     # src/{package_name}/deps.py
-    create_file(src_app / "deps.py", f"""
+    create_file(
+        src_app / "deps.py",
+        f"""
     from fastapi import Depends, HTTPException, status
     from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -203,10 +221,13 @@ def create_backend(root: Path, project_name: str):
         if user is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
         return user
-    """)
+    """,
+    )
 
     # src/{package_name}/scripts.py
-    create_file(src_app / "scripts.py", f"""
+    create_file(
+        src_app / "scripts.py",
+        f"""
     import subprocess
     import sys
     import os
@@ -246,13 +267,16 @@ def create_backend(root: Path, project_name: str):
 
     if __name__ == "__main__":
         dev()
-    """)
+    """,
+    )
 
     # src/{package_name}/models/__init__.py
     create_file(src_app / "models" / "__init__.py", "")
 
     # src/{package_name}/models/user.py
-    create_file(src_app / "models" / "user.py", f"""
+    create_file(
+        src_app / "models" / "user.py",
+        f"""
     from sqlalchemy import Column, Integer, String, Boolean, DateTime
     from sqlalchemy.sql import func
     from {package_name}.database import Base
@@ -267,13 +291,16 @@ def create_backend(root: Path, project_name: str):
         is_active = Column(Boolean, default=True)
         created_at = Column(DateTime(timezone=True), server_default=func.now())
         updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    """)
+    """,
+    )
 
     # src/{package_name}/schemas/__init__.py
     create_file(src_app / "schemas" / "__init__.py", "")
 
     # src/{package_name}/schemas/auth.py
-    create_file(src_app / "schemas" / "auth.py", f"""
+    create_file(
+        src_app / "schemas" / "auth.py",
+        """
     from pydantic import BaseModel, EmailStr
 
     class RegisterRequest(BaseModel):
@@ -295,11 +322,14 @@ def create_backend(root: Path, project_name: str):
         full_name: str
         is_active: bool
 
-        model_config = {{"from_attributes": True}}
-    """)
+        model_config = {"from_attributes": True}
+    """,
+    )
 
     # src/{package_name}/schemas/health.py
-    create_file(src_app / "schemas" / "health.py", f"""
+    create_file(
+        src_app / "schemas" / "health.py",
+        """
     from pydantic import BaseModel
     from datetime import datetime
 
@@ -307,13 +337,16 @@ def create_backend(root: Path, project_name: str):
         status: str
         timestamp: datetime
         service: str
-    """)
+    """,
+    )
 
     # src/{package_name}/services/__init__.py
     create_file(src_app / "services" / "__init__.py", "")
 
     # src/{package_name}/services/auth_service.py
-    create_file(src_app / "services" / "auth_service.py", f"""
+    create_file(
+        src_app / "services" / "auth_service.py",
+        f"""
     from datetime import datetime, timedelta, timezone
     from jose import jwt
     from passlib.context import CryptContext
@@ -352,13 +385,16 @@ def create_backend(root: Path, project_name: str):
         db.add(user)
         await db.flush()
         return user
-    """)
+    """,
+    )
 
     # src/{package_name}/routers/__init__.py
     create_file(src_app / "routers" / "__init__.py", "")
 
     # src/{package_name}/routers/health.py
-    create_file(src_app / "routers" / "health.py", f"""
+    create_file(
+        src_app / "routers" / "health.py",
+        f"""
     from fastapi import APIRouter
     from datetime import datetime, timezone
     from {package_name}.schemas.health import HealthResponse
@@ -372,10 +408,13 @@ def create_backend(root: Path, project_name: str):
             timestamp=datetime.now(timezone.utc),
             service="{project_name} API",
         )
-    """)
+    """,
+    )
 
     # Sample test so `uv run pytest` (and CI's backend job) is green on day one
-    create_file(backend / "tests" / "test_health.py", f"""
+    create_file(
+        backend / "tests" / "test_health.py",
+        f"""
     from fastapi.testclient import TestClient
 
     from {package_name}.main import app
@@ -387,10 +426,13 @@ def create_backend(root: Path, project_name: str):
         response = client.get("/api/health")
         assert response.status_code == 200
         assert response.json()["status"] == "healthy"
-    """)
+    """,
+    )
 
     # src/{package_name}/routers/auth.py
-    create_file(src_app / "routers" / "auth.py", f"""
+    create_file(
+        src_app / "routers" / "auth.py",
+        f"""
     from fastapi import APIRouter, Depends, HTTPException, status
     from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -418,7 +460,8 @@ def create_backend(root: Path, project_name: str):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
         token = create_access_token(user.id)
         return TokenResponse(access_token=token)
-    """)
+    """,
+    )
 
 
 def create_frontend(root: Path, project_name: str):
@@ -427,8 +470,10 @@ def create_frontend(root: Path, project_name: str):
     lib = frontend / "lib"
 
     # -- pubspec.yaml --
-    create_file(frontend / "pubspec.yaml", f"""
-    name: {project_name.replace('-', '_')}_frontend
+    create_file(
+        frontend / "pubspec.yaml",
+        f"""
+    name: {project_name.replace("-", "_")}_frontend
     description: "Flutter frontend for {project_name}"
     publish_to: "none"
     version: "0.1.0"
@@ -454,10 +499,13 @@ def create_frontend(root: Path, project_name: str):
 
     flutter:
       uses-material-design: true
-    """)
+    """,
+    )
 
     # -- analysis_options.yaml --
-    create_file(frontend / "analysis_options.yaml", """
+    create_file(
+        frontend / "analysis_options.yaml",
+        """
     include: package:flutter_lints/flutter.yaml
 
     linter:
@@ -465,10 +513,13 @@ def create_frontend(root: Path, project_name: str):
         prefer_const_constructors: true
         prefer_const_declarations: true
         avoid_print: false
-    """)
+    """,
+    )
 
     # -- lib/main.dart --
-    create_file(lib / "main.dart", """
+    create_file(
+        lib / "main.dart",
+        """
     import 'package:flutter/material.dart';
     import 'package:flutter_riverpod/flutter_riverpod.dart';
     import 'app.dart';
@@ -477,10 +528,13 @@ def create_frontend(root: Path, project_name: str):
       WidgetsFlutterBinding.ensureInitialized();
       runApp(const ProviderScope(child: App()));
     }
-    """)
+    """,
+    )
 
     # -- lib/app.dart --
-    create_file(lib / "app.dart", f"""
+    create_file(
+        lib / "app.dart",
+        f"""
     import 'package:flutter/material.dart';
     import 'package:flutter_riverpod/flutter_riverpod.dart';
     import 'core/router/app_router.dart';
@@ -501,10 +555,13 @@ def create_frontend(root: Path, project_name: str):
         );
       }}
     }}
-    """)
+    """,
+    )
 
     # -- lib/core/theme/app_colors.dart --
-    create_file(lib / "core" / "theme" / "app_colors.dart", """
+    create_file(
+        lib / "core" / "theme" / "app_colors.dart",
+        """
     import 'package:flutter/material.dart';
 
     class AppColors {
@@ -525,10 +582,13 @@ def create_frontend(root: Path, project_name: str):
       static const darkTextPrimary = Color(0xFFF1F5F9);
       static const darkTextSecondary = Color(0xFF94A3B8);
     }
-    """)
+    """,
+    )
 
     # -- lib/core/theme/app_text_styles.dart --
-    create_file(lib / "core" / "theme" / "app_text_styles.dart", """
+    create_file(
+        lib / "core" / "theme" / "app_text_styles.dart",
+        """
     import 'package:flutter/material.dart';
     import 'app_colors.dart';
 
@@ -554,10 +614,13 @@ def create_frontend(root: Path, project_name: str):
         color: AppColors.textSecondary,
       );
     }
-    """)
+    """,
+    )
 
     # -- lib/core/theme/app_theme.dart --
-    create_file(lib / "core" / "theme" / "app_theme.dart", """
+    create_file(
+        lib / "core" / "theme" / "app_theme.dart",
+        """
     import 'package:flutter/material.dart';
     import 'package:google_fonts/google_fonts.dart';
     import 'app_colors.dart';
@@ -591,10 +654,13 @@ def create_frontend(root: Path, project_name: str):
         ),
       );
     }
-    """)
+    """,
+    )
 
     # -- lib/core/network/api_client.dart --
-    create_file(lib / "core" / "network" / "api_client.dart", """
+    create_file(
+        lib / "core" / "network" / "api_client.dart",
+        """
     import 'package:dio/dio.dart';
     import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
@@ -647,10 +713,13 @@ def create_frontend(root: Path, project_name: str):
 
       static Future<Response<T>> delete<T>(String path) => _dio.delete<T>(path);
     }
-    """)
+    """,
+    )
 
     # -- lib/core/network/api_exception.dart --
-    create_file(lib / "core" / "network" / "api_exception.dart", """
+    create_file(
+        lib / "core" / "network" / "api_exception.dart",
+        """
     class ApiException implements Exception {
       final String message;
       final int? statusCode;
@@ -660,10 +729,13 @@ def create_frontend(root: Path, project_name: str):
       @override
       String toString() => message;
     }
-    """)
+    """,
+    )
 
     # -- lib/core/router/app_router.dart --
-    create_file(lib / "core" / "router" / "app_router.dart", """
+    create_file(
+        lib / "core" / "router" / "app_router.dart",
+        """
     import 'package:flutter_riverpod/flutter_riverpod.dart';
     import 'package:go_router/go_router.dart';
     import '../../core/network/api_client.dart';
@@ -695,10 +767,13 @@ def create_frontend(root: Path, project_name: str):
         ],
       );
     });
-    """)
+    """,
+    )
 
     # -- lib/features/auth/providers/auth_provider.dart --
-    create_file(lib / "features" / "auth" / "providers" / "auth_provider.dart", """
+    create_file(
+        lib / "features" / "auth" / "providers" / "auth_provider.dart",
+        """
     import 'package:flutter_riverpod/flutter_riverpod.dart';
     import '../repositories/auth_repository.dart';
     import '../models/auth_state.dart';
@@ -739,10 +814,13 @@ def create_frontend(root: Path, project_name: str):
         state = const AuthState.initial();
       }
     }
-    """)
+    """,
+    )
 
     # -- lib/features/auth/models/auth_state.dart --
-    create_file(lib / "features" / "auth" / "models" / "auth_state.dart", """
+    create_file(
+        lib / "features" / "auth" / "models" / "auth_state.dart",
+        """
     sealed class AuthState {
       const AuthState();
       const factory AuthState.initial() = AuthInitial;
@@ -767,10 +845,13 @@ def create_frontend(root: Path, project_name: str):
       final String message;
       const AuthError(this.message);
     }
-    """)
+    """,
+    )
 
     # -- lib/features/auth/repositories/auth_repository.dart --
-    create_file(lib / "features" / "auth" / "repositories" / "auth_repository.dart", """
+    create_file(
+        lib / "features" / "auth" / "repositories" / "auth_repository.dart",
+        """
     import 'package:dio/dio.dart';
     import '../../../core/network/api_client.dart';
     import '../../../core/network/api_exception.dart';
@@ -813,10 +894,13 @@ def create_frontend(root: Path, project_name: str):
         await ApiClient.clearToken();
       }
     }
-    """)
+    """,
+    )
 
     # -- lib/features/auth/screens/login_screen.dart --
-    create_file(lib / "features" / "auth" / "screens" / "login_screen.dart", """
+    create_file(
+        lib / "features" / "auth" / "screens" / "login_screen.dart",
+        """
     import 'package:flutter/material.dart';
     import 'package:flutter_riverpod/flutter_riverpod.dart';
     import 'package:go_router/go_router.dart';
@@ -915,10 +999,13 @@ def create_frontend(root: Path, project_name: str):
         );
       }
     }
-    """)
+    """,
+    )
 
     # -- lib/features/dashboard/providers/dashboard_provider.dart --
-    create_file(lib / "features" / "dashboard" / "providers" / "dashboard_provider.dart", """
+    create_file(
+        lib / "features" / "dashboard" / "providers" / "dashboard_provider.dart",
+        """
     import 'package:flutter_riverpod/flutter_riverpod.dart';
     import '../repositories/dashboard_repository.dart';
     import '../models/dashboard_state.dart';
@@ -944,10 +1031,13 @@ def create_frontend(root: Path, project_name: str):
         }
       }
     }
-    """)
+    """,
+    )
 
     # -- lib/features/dashboard/models/dashboard_state.dart --
-    create_file(lib / "features" / "dashboard" / "models" / "dashboard_state.dart", """
+    create_file(
+        lib / "features" / "dashboard" / "models" / "dashboard_state.dart",
+        """
     sealed class DashboardState {
       const DashboardState();
       const factory DashboardState.initial() = DashboardInitial;
@@ -973,10 +1063,13 @@ def create_frontend(root: Path, project_name: str):
       final String message;
       const DashboardError(this.message);
     }
-    """)
+    """,
+    )
 
     # -- lib/features/dashboard/repositories/dashboard_repository.dart --
-    create_file(lib / "features" / "dashboard" / "repositories" / "dashboard_repository.dart", """
+    create_file(
+        lib / "features" / "dashboard" / "repositories" / "dashboard_repository.dart",
+        """
     import 'package:dio/dio.dart';
     import '../../../core/network/api_client.dart';
     import '../../../core/network/api_exception.dart';
@@ -991,7 +1084,9 @@ def create_frontend(root: Path, project_name: str):
         }
       }
     }
-    """)
+    """,
+    )
+
 
 def create_frontend_extra(root: Path, project_name: str = ""):
     """Create remaining Flutter files that need to be outside the main create_frontend."""
@@ -1001,34 +1096,35 @@ def create_frontend_extra(root: Path, project_name: str = ""):
     # Re-write the file fully with the correct class structure
     dashboard_screen = lib / "features" / "dashboard" / "screens" / "dashboard_screen.dart"
     dashboard_screen.parent.mkdir(parents=True, exist_ok=True)
-    dashboard_screen.write_text(textwrap.dedent(f"""
+    dashboard_screen.write_text(
+        textwrap.dedent("""
     import 'package:flutter/material.dart';
     import 'package:flutter_riverpod/flutter_riverpod.dart';
     import '../providers/dashboard_provider.dart';
     import '../models/dashboard_state.dart';
 
-    class DashboardScreen extends ConsumerStatefulWidget {{
-      const DashboardScreen({{super.key}});
+    class DashboardScreen extends ConsumerStatefulWidget {
+      const DashboardScreen({super.key});
 
       @override
       ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
-    }}
+    }
 
-    class _DashboardScreenState extends ConsumerState<DashboardScreen> {{
+    class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       @override
-      void initState() {{
+      void initState() {
         super.initState();
         Future.microtask(() => ref.read(dashboardProvider.notifier).checkHealth());
-      }}
+      }
 
       @override
-      Widget build(BuildContext context) {{
+      Widget build(BuildContext context) {
         final state = ref.watch(dashboardProvider);
 
         return Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: switch (state) {{
+            child: switch (state) {
               DashboardInitial() || DashboardLoading() => const CircularProgressIndicator(),
               DashboardData(:final message) => Column(
                 mainAxisSize: MainAxisSize.min,
@@ -1056,16 +1152,20 @@ def create_frontend_extra(root: Path, project_name: str = ""):
                   ),
                 ],
               ),
-            }},
+            },
           ),
         );
-      }}
-    }}
-    """).strip() + "\n")
+      }
+    }
+    """).strip()
+        + "\n"
+    )
     print(f"[OK] Created: {dashboard_screen}")
 
     # -- lib/shared/widgets/app_shell.dart --
-    create_file(lib / "shared" / "widgets" / "app_shell.dart", f"""
+    create_file(
+        lib / "shared" / "widgets" / "app_shell.dart",
+        f"""
     import 'package:flutter/material.dart';
 
     class AppShell extends StatelessWidget {{
@@ -1095,10 +1195,13 @@ def create_frontend_extra(root: Path, project_name: str = ""):
         );
       }}
     }}
-    """)
+    """,
+    )
 
     # -- lib/shared/widgets/app_card.dart --
-    create_file(lib / "shared" / "widgets" / "app_card.dart", """
+    create_file(
+        lib / "shared" / "widgets" / "app_card.dart",
+        """
     import 'package:flutter/material.dart';
 
     class AppCard extends StatelessWidget {
@@ -1122,7 +1225,8 @@ def create_frontend_extra(root: Path, project_name: str = ""):
         );
       }
     }
-    """)
+    """,
+    )
 
 
 def create_readme(root: Path, project_name: str):
@@ -1130,7 +1234,9 @@ def create_readme(root: Path, project_name: str):
     display_name = project_name.replace("-", " ").title()
     package_name = project_name.replace("-", "_")
 
-    create_file(root / "README.md", f"""
+    create_file(
+        root / "README.md",
+        f"""
     # {display_name}
 
     Full-stack application with FastAPI backend and Flutter frontend.
@@ -1230,12 +1336,15 @@ def create_readme(root: Path, project_name: str):
     - CI (.github/workflows/ci.yml) analyzes/tests/builds both sides on PRs and
       publishes images to ghcr.io on main. It needs backend/uv.lock committed —
       bootstrapped at generation.
-    """)
+    """,
+    )
 
 
 def create_gitignore(root: Path):
     """Create a .gitignore for Python + Dart/Flutter."""
-    create_file(root / ".gitignore", """
+    create_file(
+        root / ".gitignore",
+        """
     # Python
     *.pyc
     __pycache__/
@@ -1296,14 +1405,17 @@ def create_gitignore(root: Path):
 
     # Process ID files
     *.pids
-    """)
+    """,
+    )
 
 
 def create_docker_compose(root: Path, project_name: str):
     """Create docker-compose.yml for PostgreSQL."""
     db_name = project_name.replace("-", "_")
 
-    create_file(root / "docker-compose.yml", f"""
+    create_file(
+        root / "docker-compose.yml",
+        f"""
     services:
       db:
         image: postgres:16-alpine
@@ -1326,7 +1438,8 @@ def create_docker_compose(root: Path, project_name: str):
     volumes:
       postgres_data:
         name: {project_name}-postgres-data
-    """)
+    """,
+    )
 
 
 def main(project_name: str = "my-flutter-app", compose: bool = False, local: bool = False):
@@ -1340,7 +1453,7 @@ def main(project_name: str = "my-flutter-app", compose: bool = False, local: boo
 
     root = Path.cwd()
 
-    if (root / 'backend').exists() or (root / 'frontend').exists():
+    if (root / "backend").exists() or (root / "frontend").exists():
         print("\n[WARN] Backend or frontend directory already exists. Skipping.")
         return
 
@@ -1393,27 +1506,36 @@ DEBUG=True
     print("     Also: ./dev db-up | db-down | logs | status | backup | restore | nuke")
     if local:
         print("\n  ./prod deploy")
-        print("     LAN deploy over HTTPS. Copy .env.prod.example to .env.prod and fill it in first.")
-        print("     Also: ./prod build | pull | up | down | logs | status | backup | restore | offsite-sync | tls | nuke")
-    print(f"\n  Or manually:")
-    print(f"\n  1. Backend setup:")
-    print(f"     cd backend")
-    print(f"     uv sync")
-    print(f"     uv run dev")
-    print(f"\n  2. Flutter setup (in a new terminal):")
-    print(f"     cd frontend")
-    print(f"     flutter pub get")
-    print(f"     flutter run")
-    print(f"\n  3. Open http://localhost:8000/docs for API docs")
-    print(f"\n[INFO] Check README.md for more details")
+        print(
+            "     LAN deploy over HTTPS. Copy .env.prod.example to .env.prod and fill it in first."
+        )
+        print(
+            "     Also: ./prod build | pull | up | down | logs | status | backup | restore | offsite-sync | tls | nuke"
+        )
+    print("\n  Or manually:")
+    print("\n  1. Backend setup:")
+    print("     cd backend")
+    print("     uv sync")
+    print("     uv run dev")
+    print("\n  2. Flutter setup (in a new terminal):")
+    print("     cd frontend")
+    print("     flutter pub get")
+    print("     flutter run")
+    print("\n  3. Open http://localhost:8000/docs for API docs")
+    print("\n[INFO] Check README.md for more details")
     print("\n" + "=" * 60)
 
 
 if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser(description="Create a Flutter + FastAPI project")
-    parser.add_argument("project_name", nargs="?", default="my-flutter-app", help="Name of the project")
-    parser.add_argument("--compose", action="store_true", help="Generate docker-compose.yml for PostgreSQL")
+    parser.add_argument(
+        "project_name", nargs="?", default="my-flutter-app", help="Name of the project"
+    )
+    parser.add_argument(
+        "--compose", action="store_true", help="Generate docker-compose.yml for PostgreSQL"
+    )
     parser.add_argument(
         "--local",
         action="store_true",

@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-import re
-import os
-import sys
 import argparse
-from pathlib import Path
+import os
+import re
+import sys
 from datetime import datetime
+from pathlib import Path
+from typing import Optional
 
 import requests
 from dotenv import load_dotenv
@@ -46,12 +47,11 @@ def find_gist_by_filename(token: str, filenames: list[str], description: str) ->
     matching_gists = []
     for gist in gists:
         gist_files = list(gist["files"].keys())
-        if any(filename in gist_files for filename in filenames):
-            if not description or (
-                gist["description"]
-                and description.lower() in gist["description"].lower()
-            ):
-                matching_gists.append(gist)
+        if any(filename in gist_files for filename in filenames) and (
+            not description
+            or (gist["description"] and description.lower() in gist["description"].lower())
+        ):
+            matching_gists.append(gist)
     return matching_gists
 
 
@@ -88,9 +88,9 @@ def list_gists(token: str):
         description = gist["description"] or "No description"
         filenames = ", ".join(gist["files"].keys())
         url = gist["html_url"]
-        created_at = datetime.strptime(
-            gist["created_at"], "%Y-%m-%dT%H:%M:%SZ"
-        ).strftime("%Y-%m-%d %H:%M:%S")
+        created_at = datetime.strptime(gist["created_at"], "%Y-%m-%dT%H:%M:%SZ").strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
         print(f"ID: {gist_id}")
         print(f"Description: {description}")
         print(f"Files: {filenames}")
@@ -146,9 +146,9 @@ def upload_gist(
                 desc = gist["description"] or "No description"
                 files = ", ".join(gist["files"].keys())
                 url = gist["html_url"]
-                created_at = datetime.strptime(
-                    gist["created_at"], "%Y-%m-%dT%H:%M:%SZ"
-                ).strftime("%Y-%m-%d %H:%M:%S")
+                created_at = datetime.strptime(gist["created_at"], "%Y-%m-%dT%H:%M:%SZ").strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                )
                 print(f"ID: {gist_id}")
                 print(f"Description: {desc}")
                 print(f"Files: {files}")
@@ -200,9 +200,7 @@ def upload_gist(
         sys.exit(1)
 
 
-def update_gist(
-    file_paths: list[Path], update: str, description: str, token: str
-) -> str:
+def update_gist(file_paths: list[Path], update: str, description: str, token: str) -> str:
     """
     Updates an existing gist by filename or gist ID.
 
@@ -228,8 +226,7 @@ def update_gist(
 
     gist_id = gist["id"]
     existing_description = (
-        gist["description"]
-        or f"Uploaded {', '.join(gist['files'].keys())} via automations CLI"
+        gist["description"] or f"Uploaded {', '.join(gist['files'].keys())} via automations CLI"
     )
 
     # Prepare files for update
@@ -333,7 +330,7 @@ def delete_gist(token: str, gist_identifier: str) -> bool:
         sys.exit(1)
 
 
-def download_gist(token: str, gist_id_or_url: str, output_dir: str = None):
+def download_gist(token: str, gist_id_or_url: str, output_dir: Optional[str] = None):
     """Download a gist by ID or URL and save its files locally."""
     # Extract gist ID from URL if needed
     match = re.search(r"([0-9a-f]{32})", gist_id_or_url)
@@ -410,21 +407,15 @@ if __name__ == "__main__":
         subparsers.add_parser("list", help="List existing gists.")
 
         # Delete subcommand
-        delete_parser = subparsers.add_parser(
-            "delete", help="Delete a gist by filename or ID."
-        )
+        delete_parser = subparsers.add_parser("delete", help="Delete a gist by filename or ID.")
         delete_parser.add_argument(
             "gist_identifier",
             help="Gist ID or filename to identify the gist to delete.",
         )
 
         # Download subcommand
-        download_parser = subparsers.add_parser(
-            "download", help="Download a gist by ID or URL."
-        )
-        download_parser.add_argument(
-            "gist_id_or_url", help="Gist ID or full gist URL to download."
-        )
+        download_parser = subparsers.add_parser("download", help="Download a gist by ID or URL.")
+        download_parser.add_argument("gist_id_or_url", help="Gist ID or full gist URL to download.")
         download_parser.add_argument(
             "--output-dir",
             default=None,
@@ -456,9 +447,7 @@ if __name__ == "__main__":
                 args.non_interactive,
             )
         elif args.action == "update":
-            update_gist(
-                [Path(p) for p in args.file_paths], args.update, args.description, token
-            )
+            update_gist([Path(p) for p in args.file_paths], args.update, args.description, token)
         elif args.action == "list":
             list_gists(token)
         elif args.action == "delete":

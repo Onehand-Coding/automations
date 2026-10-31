@@ -1,26 +1,23 @@
 #!/usr/bin/env python3
-import sys
 import argparse
-from pathlib import Path
-from typing import Optional
+import sys
 from datetime import datetime
+from pathlib import Path
 
-from helper import setup_logging, confirm
+from helper import setup_logging
 from helper.templates import (
     DEFAULT_LICENSE,
-    LICENSE_TEMPLATES,
-    README_TEMPLATE,
-    PYPROJECT_TEMPLATE,
     GITIGNORE_TEMPLATE,
+    LICENSE_TEMPLATES,
+    PYPROJECT_TEMPLATE,
+    README_TEMPLATE,
 )
 
 logger = setup_logging(log_file="docs_generator.log")
 
 
 # --- Helper Functions ---
-def create_readme(
-    output_dir: Path, project_name: str, license: str, description: str
-) -> None:
+def create_readme(output_dir: Path, project_name: str, license: str, description: str) -> None:
     """Create a README.md file."""
     readme_path = output_dir / "README.md"
     content = README_TEMPLATE.format(
@@ -233,9 +230,7 @@ Examples:
     try:
         # Generate files based on flags
         if args.all or args.readme:
-            create_readme(
-                output_dir, args.project_name, args.license_type, args.description
-            )
+            create_readme(output_dir, args.project_name, args.license_type, args.description)
         if args.all or args.pyproject:
             create_pyproject_toml(
                 output_dir,
@@ -252,7 +247,7 @@ Examples:
             create_license_file(output_dir, args.license_type, args.author)
 
         print(f"✅ Successfully generated documentation files in {output_dir}")
-        logger.info(f"Documentation generation completed successfully")
+        logger.info("Documentation generation completed successfully")
 
     except Exception as e:
         logger.error(f"Failed to generate documentation: {e}")

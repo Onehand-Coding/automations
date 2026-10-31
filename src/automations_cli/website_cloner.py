@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
+import argparse
+import shutil
+import subprocess
 import sys
 import time
-import shutil
-import argparse
-import subprocess
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 from urllib.parse import urlparse, urlunparse
 
 from helper import setup_logging
@@ -44,9 +44,7 @@ class WebsiteCloner:
             result = subprocess.run(
                 ["httrack", "--version"], capture_output=True, text=True, timeout=10
             )
-            version_info = (
-                result.stdout.split("\n")[0] if result.stdout else "Unknown version"
-            )
+            version_info = result.stdout.split("\n")[0] if result.stdout else "Unknown version"
             self.logger.info(f"HTTrack found: {version_info}")
         except Exception as e:
             self.logger.warning(f"Could not determine HTTrack version: {e}")
@@ -64,9 +62,7 @@ class WebsiteCloner:
             self.logger.debug("Write permissions confirmed")
 
         except PermissionError as e:
-            error_msg = (
-                f"Permission denied creating output directory: {self.base_output_dir}"
-            )
+            error_msg = f"Permission denied creating output directory: {self.base_output_dir}"
             self.logger.critical(error_msg)
             raise PermissionError(error_msg) from e
         except Exception as e:
@@ -124,7 +120,7 @@ class WebsiteCloner:
             self.logger.error(error_msg)
             raise ValueError(error_msg) from e
 
-    def clone_site(self, url: str, custom_options: Optional[List[str]] = None) -> bool:
+    def clone_site(self, url: str, custom_options: Optional[list[str]] = None) -> bool:
         """
         Clone a single website using HTTrack.
 
@@ -195,9 +191,9 @@ class WebsiteCloner:
             # Check if files were actually created
             if output_path.exists() and any(output_path.iterdir()):
                 file_count = len(list(output_path.rglob("*")))
-                size_mb = sum(
-                    f.stat().st_size for f in output_path.rglob("*") if f.is_file()
-                ) / (1024 * 1024)
+                size_mb = sum(f.stat().st_size for f in output_path.rglob("*") if f.is_file()) / (
+                    1024 * 1024
+                )
 
                 self.logger.info(
                     f"✅ Successfully cloned {normalized_url} "
@@ -217,8 +213,7 @@ class WebsiteCloner:
         except subprocess.CalledProcessError as e:
             elapsed_time = time.time() - start_time
             self.logger.error(
-                f"❌ HTTrack failed for {url} (exit code {e.returncode}) "
-                f"after {elapsed_time:.1f}s"
+                f"❌ HTTrack failed for {url} (exit code {e.returncode}) after {elapsed_time:.1f}s"
             )
             if e.stderr:
                 self.logger.error(f"HTTrack error output: {e.stderr}")
@@ -232,7 +227,7 @@ class WebsiteCloner:
             return False
 
     def clone_multiple_sites(
-        self, urls: List[str], custom_options: Optional[List[str]] = None
+        self, urls: list[str], custom_options: Optional[list[str]] = None
     ) -> dict:
         """
         Clone multiple websites.
@@ -290,9 +285,7 @@ Examples:
         """,
     )
 
-    parser.add_argument(
-        "urls", metavar="URL", nargs="+", help="One or more URLs to clone"
-    )
+    parser.add_argument("urls", metavar="URL", nargs="+", help="One or more URLs to clone")
 
     parser.add_argument(
         "-d",

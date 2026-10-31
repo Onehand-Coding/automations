@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
-import sys
-import json
-import shutil
-import logging
 import argparse
+import json
+import logging
+import shutil
 import subprocess
+import sys
+from datetime import datetime, timezone
 from pathlib import Path
-from datetime import datetime
-from datetime import timezone
-
-from tqdm import tqdm
 
 from helper import LOG_DIR
+from tqdm import tqdm
 
 # --- Constants ---
 SUPPORTED_IMAGE_EXTENSIONS = {
@@ -35,9 +33,7 @@ SUPPORTED_VIDEO_EXTENSIONS = {
     ".mpeg",
     ".3gp",
 }
-SUPPORTED_MEDIA_EXTENSIONS = SUPPORTED_IMAGE_EXTENSIONS.union(
-    SUPPORTED_VIDEO_EXTENSIONS
-)
+SUPPORTED_MEDIA_EXTENSIONS = SUPPORTED_IMAGE_EXTENSIONS.union(SUPPORTED_VIDEO_EXTENSIONS)
 LOG_FILENAME = LOG_DIR / "metadata_embedder.log"
 
 # --- Logging Setup ---
@@ -108,23 +104,17 @@ def find_matching_json(media_path: Path):
     edited_json_path = parent_dir / edited_json_name
     numbered_suffix_pattern = f"{media_name_no_ext}(*){media_path.suffix}.json"
     old_numbered_pattern = f"{media_path.name}(*).json"
-    general_suffix_pattern = (
-        f"{media_path.stem}.*.json"  # Use stem for general match base
-    )
+    general_suffix_pattern = f"{media_path.stem}.*.json"  # Use stem for general match base
 
     try:
         # 1. Exact Match Check
         if exact_json_path.is_file():
-            logger.debug(
-                f"Found exact JSON match for {media_path.name}: {exact_json_path.name}"
-            )
+            logger.debug(f"Found exact JSON match for {media_path.name}: {exact_json_path.name}")
             return exact_json_path
 
         # 2. Edited Match Check
         if edited_json_path.is_file():
-            logger.debug(
-                f"Found edited JSON match for {media_path.name}: {edited_json_path.name}"
-            )
+            logger.debug(f"Found edited JSON match for {media_path.name}: {edited_json_path.name}")
             return edited_json_path
 
         # 3. Numbered Suffix 1 Check (e.g., file(1).jpg.json)
@@ -132,9 +122,7 @@ def find_matching_json(media_path: Path):
         if numbered_matches:
             # Basic check: ensure the found name starts correctly and has the number part
             expected_start = f"{media_name_no_ext}("
-            valid_numbered = [
-                p for p in numbered_matches if p.name.startswith(expected_start)
-            ]
+            valid_numbered = [p for p in numbered_matches if p.name.startswith(expected_start)]
             if valid_numbered:
                 logger.debug(
                     f"Found numbered suffix JSON match (pattern 1) for {media_path.name}: {valid_numbered[0].name}"
@@ -144,9 +132,7 @@ def find_matching_json(media_path: Path):
         # 4. Numbered Suffix 2 Check (e.g., file.jpg(1).json) - Older pattern
         old_numbered_matches = sorted(list(parent_dir.glob(old_numbered_pattern)))
         # Filter out the exact match name if it somehow matches the glob
-        old_numbered_matches = [
-            p for p in old_numbered_matches if p.name != exact_json_name
-        ]
+        old_numbered_matches = [p for p in old_numbered_matches if p.name != exact_json_name]
         if old_numbered_matches:
             logger.debug(
                 f"Found numbered suffix JSON match (pattern 2) for {media_path.name}: {old_numbered_matches[0].name}"
@@ -171,9 +157,7 @@ def find_matching_json(media_path: Path):
             if not is_checked:
                 # Check if it's a valid file before returning
                 if p.is_file():
-                    logger.debug(
-                        f"Found general suffix JSON match for {media_path.name}: {p.name}"
-                    )
+                    logger.debug(f"Found general suffix JSON match for {media_path.name}: {p.name}")
                     return p
                 else:
                     # Log if glob finds something that isn't a file (like a dir named .json)
@@ -189,15 +173,11 @@ def find_matching_json(media_path: Path):
             return None  # Skip this file
         else:
             # Reraise other OS errors
-            logger.error(
-                f"An OS error occurred checking JSON for {media_path.name}: {e}"
-            )
+            logger.error(f"An OS error occurred checking JSON for {media_path.name}: {e}")
             raise  # Reraise unexpected OS errors
     except Exception as e:
         # Catch potential unexpected errors during file checks
-        logger.error(
-            f"An unexpected error occurred finding JSON for {media_path.name}: {e}"
-        )
+        logger.error(f"An unexpected error occurred finding JSON for {media_path.name}: {e}")
         return None  # Treat as not found
 
     # If no match found after all checks
@@ -214,9 +194,7 @@ def embed_metadata(media_path: Path, json_path: Path, dry_run: bool):
     Returns True on success, False on failure.
     """
     # This message goes to file, and console if verbose
-    logger.info(
-        f"Attempting to embed metadata from {json_path.name} into {media_path.name}"
-    )
+    logger.info(f"Attempting to embed metadata from {json_path.name} into {media_path.name}")
 
     if not json_path.is_file():
         # Error goes to file, and console if verbose
@@ -227,14 +205,12 @@ def embed_metadata(media_path: Path, json_path: Path, dry_run: bool):
     metadata = None
     formatted_date = None
     try:
-        with open(json_path, "r", encoding="utf-8") as f:
+        with open(json_path, encoding="utf-8") as f:
             metadata = json.load(f)
         logger.debug(f"Successfully parsed JSON: {json_path.name}")  # Debug level
 
         # Extract and format the primary timestamp
-        if "photoTakenTime" in metadata and "timestamp" in metadata.get(
-            "photoTakenTime", {}
-        ):
+        if "photoTakenTime" in metadata and "timestamp" in metadata.get("photoTakenTime", {}):
             timestamp_str = metadata["photoTakenTime"]["timestamp"]
             try:
                 timestamp_int = int(timestamp_str)
@@ -244,9 +220,7 @@ def embed_metadata(media_path: Path, json_path: Path, dry_run: bool):
                 )  # FIX for DeprecationWarning
                 # Format for exiftool (-d '%Y:%m:%d %H:%M:%S' is implicit default for assignments)
                 formatted_date = dt_object.strftime("%Y:%m:%d %H:%M:%S")
-                logger.debug(
-                    f"Extracted photoTakenTime for {media_path.name}: {formatted_date}"
-                )
+                logger.debug(f"Extracted photoTakenTime for {media_path.name}: {formatted_date}")
             except (ValueError, TypeError) as ts_err:
                 logger.warning(
                     f"Could not parse timestamp '{timestamp_str}' from {json_path.name}: {ts_err}"
@@ -319,9 +293,7 @@ def embed_metadata(media_path: Path, json_path: Path, dry_run: bool):
         # Debug message goes to file, and console if verbose
         logger.debug(f"Running exiftool command: {' '.join(cmd)}")
 
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, check=False, encoding="utf-8"
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False, encoding="utf-8")
 
         if result.returncode == 0:
             # Check stdout for common "1 image files updated" message
@@ -332,9 +304,7 @@ def embed_metadata(media_path: Path, json_path: Path, dry_run: bool):
                 logger.info(f"Successfully embedded metadata into {media_path.name}")
             else:
                 # Log potentially unchanged files or other messages as debug info
-                logger.debug(
-                    f"Exiftool ran for {media_path.name}. Output: {result.stdout.strip()}"
-                )
+                logger.debug(f"Exiftool ran for {media_path.name}. Output: {result.stdout.strip()}")
 
             # Also log warnings from stderr even on success (return code 0)
             if result.stderr and result.stderr.strip():
@@ -346,9 +316,7 @@ def embed_metadata(media_path: Path, json_path: Path, dry_run: bool):
             return True
         else:
             # Log failures
-            log_level = (
-                logging.ERROR
-            )  # Treat any non-zero exit code as error for simplicity
+            log_level = logging.ERROR  # Treat any non-zero exit code as error for simplicity
             # Warning/Error messages go to file, and console if verbose
             logger.log(
                 log_level,
@@ -478,9 +446,7 @@ def main():
     # --- Validate Input Directory ---
     root_dir = Path(args.takeout_dir)
     if not root_dir.is_dir():
-        logger.error(
-            f"Error: Takeout directory not found or is not a directory: {root_dir}"
-        )
+        logger.error(f"Error: Takeout directory not found or is not a directory: {root_dir}")
         # Print critical error to console regardless of verbosity
         print(
             f"ERROR: Takeout directory not found or is not a directory: {root_dir}",

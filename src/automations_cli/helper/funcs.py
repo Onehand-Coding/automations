@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 import csv
 import json
-from pathlib import Path
 from datetime import datetime
-from typing import List, Dict, Any, Union, Optional
+from pathlib import Path
+from typing import Any, Optional, Union
 
 
-def confirm(
-    question: str, /, *, choice: str = "[Y/N] :", confirm_letter: str = "y"
-) -> bool:
+def confirm(question: str, /, *, choice: str = "[Y/N] :", confirm_letter: str = "y") -> bool:
     """Prompt user for confirmation.
 
     Args:
@@ -47,7 +45,7 @@ def get_valid_num() -> int:
             print("Enter an integer!")
 
 
-def get_index(list_of_data: List) -> int:
+def get_index(list_of_data: list) -> int:
     """Get a valid index from the user.
 
     Args:
@@ -87,8 +85,7 @@ def new_filepath(
 
     while True:
         new_path = (
-            base_path.parent
-            / f"{base_path.stem}{add_prefix}({start_count}){base_path.suffix}"
+            base_path.parent / f"{base_path.stem}{add_prefix}({start_count}){base_path.suffix}"
         )
         if not new_path.exists():
             return new_path
@@ -112,7 +109,7 @@ def get_folder_path(task: str) -> Path:
         print("Invalid path. Please enter a valid path!")
 
 
-def choose(choices: List, task: str = "") -> Any:
+def choose(choices: list, task: str = "") -> Any:
     """Prompt the user to choose an item from a list.
 
     Args:
@@ -160,17 +157,17 @@ def read_print_json(json_file: Union[str, Path]) -> None:
     Args:
         json_file: Path to the JSON file
     """
-    with open(json_file, "r") as f:
+    with open(json_file) as f:
         data = json.load(f)
     print(json.dumps(data, indent=4))
 
 
 def csv_dict_writer(
     filename: Union[str, Path],
-    data: List[Dict],
+    data: list[dict],
     *,
     delimiter: str = ",",
-    fieldnames: Optional[List[str]] = None,
+    fieldnames: Optional[list[str]] = None,
 ) -> None:
     """Write list of dictionaries to a CSV file.
 
@@ -196,7 +193,7 @@ def read_csv_dict_output(csv_file: Union[str, Path], *, delimiter: str = ",") ->
         csv_file: Path to the CSV file
         delimiter: Delimiter character for CSV
     """
-    with open(csv_file, "r", encoding="utf-8") as f:
+    with open(csv_file, encoding="utf-8") as f:
         csv_reader = csv.DictReader(f, delimiter=delimiter)
         for row in csv_reader:
             for key, value in row.items():
@@ -211,7 +208,7 @@ def read_csv_list_output(csv_file: Union[str, Path], *, delimiter: str = ",") ->
         csv_file: Path to the CSV file
         delimiter: Delimiter character for CSV
     """
-    with open(csv_file, "r", encoding="utf-8") as f:
+    with open(csv_file, encoding="utf-8") as f:
         csv_reader = csv.reader(f, delimiter=delimiter)
         headers = next(csv_reader)
         print()

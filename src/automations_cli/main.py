@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-import sys
 import subprocess
+import sys
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional
 
 import typer
 
@@ -15,9 +15,7 @@ app = typer.Typer(
 )
 
 # Dedicated Typer app for the subtitle commands
-subtitle_app = typer.Typer(
-    name="subtitle", help="Tools for shifting and embedding subtitles."
-)
+subtitle_app = typer.Typer(name="subtitle", help="Tools for shifting and embedding subtitles.")
 
 # Dedicated Typer app for gist commands
 gist_app = typer.Typer(name="gist", help="Tools for managing GitHub gists.")
@@ -34,8 +32,9 @@ app.add_typer(download_app)
 
 
 # --- Helper Function to Run Scripts ---
-def _run_script(script_name: str, args: list[str] = [], use_sudo: bool = False):
+def _run_script(script_name: str, args: Optional[list[str]] = None, use_sudo: bool = False):
     """Finds and runs a script from the 'commands' directory."""
+    args = args or []
     python_executable = sys.executable
     cli_dir = Path(__file__).parent
     script_path = cli_dir / script_name
@@ -47,7 +46,7 @@ def _run_script(script_name: str, args: list[str] = [], use_sudo: bool = False):
         )
         raise typer.Exit(1)
 
-    command = [python_executable, str(script_path)] + args
+    command = [python_executable, str(script_path), *args]
     if use_sudo:
         command.insert(0, "sudo")
         typer.secho(
@@ -60,15 +59,15 @@ def _run_script(script_name: str, args: list[str] = [], use_sudo: bool = False):
     try:
         subprocess.call(command)
     except KeyboardInterrupt:
-        raise typer.Exit(130)
+        raise typer.Exit(130) from None
 
 
 # --- CLI Commands ---
-@app.command(help="Generates a new project with flexible templates (app/cli/lib), interactive mode, or fullstack (FastAPI + React).")
+@app.command(
+    help="Generates a new project with flexible templates (app/cli/lib), interactive mode, or fullstack (FastAPI + React)."
+)
 def generate_project(
-    project_name: str = typer.Argument(
-        ..., help="The name for the new project directory."
-    ),
+    project_name: str = typer.Argument(..., help="The name for the new project directory."),
     path: Optional[str] = typer.Option(
         None, "--path", "-p", help="Path to create project (default: ~/Coding/projects)"
     ),
@@ -76,7 +75,10 @@ def generate_project(
         "lib", "--type", "-t", help="Project type: app, cli, or lib (default: lib)"
     ),
     fullstack: bool = typer.Option(
-        False, "--fullstack", "-f", help="Create a fullstack project with FastAPI backend and React frontend"
+        False,
+        "--fullstack",
+        "-f",
+        help="Create a fullstack project with FastAPI backend and React frontend",
     ),
     flutter: bool = typer.Option(
         False, "--flutter", "-F", help="Create a Flutter project with FastAPI backend"
@@ -88,7 +90,10 @@ def generate_project(
         help="[Fullstack/Flutter] Generate dev/prod scripts + prod stack for LAN deployment (implies --compose)",
     ),
     compose: bool = typer.Option(
-        False, "--compose", "-c", help="[Fullstack/Flutter only] Generate docker-compose.yml for PostgreSQL"
+        False,
+        "--compose",
+        "-c",
+        help="[Fullstack/Flutter only] Generate docker-compose.yml for PostgreSQL",
     ),
     no_docs: bool = typer.Option(
         False,
@@ -117,12 +122,8 @@ def generate_project(
     no_venv: bool = typer.Option(
         False, "--no-venv", "-V", help="Skip virtual environment creation"
     ),
-    no_git: bool = typer.Option(
-        False, "--no-git", "-g", help="Skip Git repository initialization"
-    ),
-    open: bool = typer.Option(
-        False, "--open", "-o", help="Open in Sublime Text after creation"
-    ),
+    no_git: bool = typer.Option(False, "--no-git", "-g", help="Skip Git repository initialization"),
+    open: bool = typer.Option(False, "--open", "-o", help="Open in Sublime Text after creation"),
     interactive: bool = typer.Option(
         False, "--interactive", "-i", help="Prompt interactively for all project options."
     ),
@@ -176,9 +177,7 @@ def generate_docs(
     ),
     readme: bool = typer.Option(False, "--readme", help="Generate README.md"),
     license: bool = typer.Option(False, "--license", help="Generate LICENSE"),
-    pyproject: bool = typer.Option(
-        False, "--pyproject", help="Generate pyproject.toml"
-    ),
+    pyproject: bool = typer.Option(False, "--pyproject", help="Generate pyproject.toml"),
     gitignore: bool = typer.Option(False, "--gitignore", help="Generate .gitignore"),
     project_name: str = typer.Option(
         "my_project",
@@ -240,7 +239,7 @@ def organize_files(
     folder_path: str = typer.Argument(
         help="Absolute path for folder you wish to organize files from."
     ),
-    method: List[str] = typer.Option(
+    method: list[str] = typer.Option(
         ["type"],
         "--method",
         "-m",
@@ -264,7 +263,7 @@ def organize_files(
         "-v",
         help="Enable verbose output",
     ),
-    exclude: List[str] = typer.Option(
+    exclude: list[str] = typer.Option(
         None,
         "--exclude",
         help="Files or folders to exclude from organization. Can specify multiple.",
@@ -275,7 +274,7 @@ def organize_files(
     """
     args = [folder_path]
     if method:
-        args.extend(["--method"] + method)
+        args.extend(["--method", *method])
     if recursive:
         args.append("--recursive")
     if dry_run:
@@ -283,7 +282,7 @@ def organize_files(
     if verbose:
         args.append("--verbose")
     if exclude:
-        args.extend(["--exclude"] + list(exclude))
+        args.extend(["--exclude", *list(exclude)])
 
     _run_script("file_organizer.py", args)
 
@@ -297,10 +296,14 @@ def process_takeout(
         False, "--dry-run", help="Simulate the process without modifying or deleting any files."
     ),
     delete_json: bool = typer.Option(
-        False, "--delete-json", help="Delete JSON files after successfully embedding metadata (prompts for confirmation)."
+        False,
+        "--delete-json",
+        help="Delete JSON files after successfully embedding metadata (prompts for confirmation).",
     ),
     verbose: bool = typer.Option(
-        False, "--verbose", help="Print detailed logs (INFO+) to the console in addition to the log file."
+        False,
+        "--verbose",
+        help="Print detailed logs (INFO+) to the console in addition to the log file.",
     ),
     yes: bool = typer.Option(
         False, "--yes", help="Automatically confirm JSON deletion (use with caution!)."
@@ -374,12 +377,8 @@ def run_wireguard(
 
 @app.command()
 def pg_backup(
-    action: str = typer.Argument(
-        ..., help="Action to perform: 'backup', 'restore', or 'list'."
-    ),
-    db_url: Optional[str] = typer.Option(
-        None, "--db-url", help="Database connection string/URL."
-    ),
+    action: str = typer.Argument(..., help="Action to perform: 'backup', 'restore', or 'list'."),
+    db_url: Optional[str] = typer.Option(None, "--db-url", help="Database connection string/URL."),
     backup_file: Optional[str] = typer.Option(
         None, "--backup-file", help="Specific backup file to restore."
     ),
@@ -432,7 +431,7 @@ def is_playlist_url(url: str) -> bool:
         )
         ids = [line for line in result.stdout.strip().splitlines() if line]
         return len(ids) > 1
-    except Exception as e:
+    except Exception:
         # If yt-dlp fails, assume not a playlist
         return False
 
@@ -527,9 +526,7 @@ def download_video(
             )
             raise typer.Exit(1)
         if playlist_mode == "items" and not items:
-            typer.echo(
-                "❌ Error: --playlist-mode items requires --items parameter", err=True
-            )
+            typer.echo("❌ Error: --playlist-mode items requires --items parameter", err=True)
             raise typer.Exit(1)
         if playlist_mode == "all":
             args.extend(["--playlist-mode", "download_all_video"])
@@ -624,9 +621,7 @@ def download_audio(
             )
             raise typer.Exit(1)
         if playlist_mode == "items" and not items:
-            typer.echo(
-                "❌ Error: --playlist-mode items requires --items parameter", err=True
-            )
+            typer.echo("❌ Error: --playlist-mode items requires --items parameter", err=True)
             raise typer.Exit(1)
         if playlist_mode == "all":
             args.extend(["--playlist-mode", "download_all_audio"])
@@ -642,7 +637,7 @@ def download_audio(
 
 @download_app.command("file")
 def download_file(
-    urls: List[str] = typer.Argument(..., help="One or more URLs to download."),
+    urls: list[str] = typer.Argument(..., help="One or more URLs to download."),
     output_name: Optional[str] = typer.Option(
         None,
         "--output-name",
@@ -666,9 +661,7 @@ def download_file(
         "--no-resume",
         help="Disable resume functionality (default: resume enabled).",
     ),
-    quiet: bool = typer.Option(
-        False, "--quiet", "-q", help="Suppress output (quiet mode)."
-    ),
+    quiet: bool = typer.Option(False, "--quiet", "-q", help="Suppress output (quiet mode)."),
 ):
     """Download one or more files using aria2c, wget, or curl."""
     args = urls
@@ -688,7 +681,7 @@ def download_file(
 
 @download_app.command("torrent")
 def download_torrent(
-    torrents: Optional[List[str]] = typer.Argument(
+    torrents: Optional[list[str]] = typer.Argument(
         None, help="One or more .torrent files or magnet links."
     ),
     output_dir: Optional[str] = typer.Option(
@@ -726,9 +719,7 @@ def download_torrent(
     resume: bool = typer.Option(
         False, "--resume", help="Resume all downloads (not implemented, placeholder)."
     ),
-    quiet: bool = typer.Option(
-        False, "--quiet", help="Suppress aria2c output except errors."
-    ),
+    quiet: bool = typer.Option(False, "--quiet", help="Suppress aria2c output except errors."),
     create_config: bool = typer.Option(
         False, "--create-config", help="Create a default configuration file and exit."
     ),
@@ -830,21 +821,15 @@ def gist_list():
 
 @gist_app.command("upload")
 def gist_upload(
-    file_paths: List[str] = typer.Argument(
-        ..., help="Paths to the files to upload as a gist."
-    ),
-    description: str = typer.Option(
-        "", "--description", "-d", help="Description for the gist."
-    ),
-    public: bool = typer.Option(
-        False, "--public", help="Create a public gist (default: secret)."
-    ),
+    file_paths: list[str] = typer.Argument(..., help="Paths to the files to upload as a gist."),
+    description: str = typer.Option("", "--description", "-d", help="Description for the gist."),
+    public: bool = typer.Option(False, "--public", help="Create a public gist (default: secret)."),
     non_interactive: bool = typer.Option(
         False, "--non-interactive", help="Skip prompting and create new gist."
     ),
 ):
     """Uploads files as a new GitHub Gist."""
-    args = ["upload"] + list(file_paths)
+    args = ["upload", *list(file_paths)]
     if description:
         args.extend(["--description", description])
     if public:
@@ -859,7 +844,7 @@ def gist_update(
     gist_identifier: str = typer.Argument(
         ..., help="Gist ID or filename to identify the gist to update."
     ),
-    file_paths: Optional[List[str]] = typer.Argument(
+    file_paths: Optional[list[str]] = typer.Argument(
         None,
         help="Paths to the files to update (optional for description-only updates).",
     ),
@@ -911,9 +896,7 @@ def gist_update(
             err=True,
         )
         typer.echo(
-            "Use: automations gist update {} --description '{}' --description-only".format(
-                gist_identifier, description
-            ),
+            f"Use: automations gist update {gist_identifier} --description '{description}' --description-only",
             err=True,
         )
         raise typer.Exit(1)
@@ -941,9 +924,7 @@ def gist_delete(
 
 @gist_app.command("download")
 def gist_download(
-    gist_id_or_url: str = typer.Argument(
-        ..., help="Gist ID or full gist URL to download."
-    ),
+    gist_id_or_url: str = typer.Argument(..., help="Gist ID or full gist URL to download."),
     output_dir: Optional[str] = typer.Option(
         None,
         "--output-dir",

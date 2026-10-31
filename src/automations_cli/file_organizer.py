@@ -1,22 +1,21 @@
 #!/usr/bin/env python3
+import argparse
+import logging
 import os
 import re
-import sys
 import shutil
-import logging
-import argparse
+import sys
+from collections import defaultdict
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from pathlib import Path
-from collections import defaultdict
 from itertools import combinations, zip_longest
-from typing import List, Dict, Set, Optional, Union
-from dataclasses import dataclass, field
-
-from tqdm import tqdm
-from send2trash import send2trash
+from pathlib import Path
+from typing import Optional, Union
 
 from helper import new_filepath, setup_logging
+from send2trash import send2trash
+from tqdm import tqdm
 
 # Constants
 TO_REPLACE_PATTERN = re.compile(r"\[.*\]|\(.*\)")
@@ -37,7 +36,7 @@ class OrganizationStats:
     errors: int = 0
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
-    method_stats: Dict[str, int] = field(default_factory=dict)
+    method_stats: dict[str, int] = field(default_factory=dict)
 
     def duration(self) -> str:
         """Calculate and return formatted duration."""
@@ -113,11 +112,11 @@ class FileOrganizer:
     def __init__(
         self,
         to_sort_path: Union[str, Path],
-        methods: List[SortMethod],
+        methods: list[SortMethod],
         recursive: bool = False,
         dry_run: bool = False,
         verbose: bool = False,
-        to_exclude_files: Optional[List[str]] = None,
+        to_exclude_files: Optional[list[str]] = None,
     ):
         """Initialize FileOrganizer.
 
@@ -140,9 +139,7 @@ class FileOrganizer:
         self.progress_bar = None
 
         if not isinstance(self.to_exclude_files, list):
-            raise TypeError(
-                "to_exclude_files argument must be a list of file or folder names!"
-            )
+            raise TypeError("to_exclude_files argument must be a list of file or folder names!")
 
         # Configure logging level based on verbose flag
         if self.verbose:
@@ -153,14 +150,14 @@ class FileOrganizer:
         if self.verbose:
             logger.info(message)
 
-    def update_progress(self, description: str = None) -> None:
+    def update_progress(self, description: Optional[str] = None) -> None:
         """Update progress bar with optional description."""
         if self.progress_bar:
             if description:
                 self.progress_bar.set_description(description)
             self.progress_bar.update(1)
 
-    def map_file_extensions(self) -> Dict[str, Path]:
+    def map_file_extensions(self) -> dict[str, Path]:
         """Map file extensions to their destination folders."""
         default_paths = {
             file_type: self.to_sort_path / f"{file_type.name.title()} files"
@@ -181,7 +178,7 @@ class FileOrganizer:
         """Check if a file or folder should be excluded."""
         return any(to_exclude in file.parts for to_exclude in self.to_exclude_files)
 
-    def get_folders(self) -> List[Path]:
+    def get_folders(self) -> list[Path]:
         """Get all folders in the directory to sort."""
         if self.recursive:
             return [
@@ -191,12 +188,10 @@ class FileOrganizer:
             ]
         else:
             return [
-                folder
-                for folder in self.to_sort_path.glob("*/")
-                if not self.should_exclude(folder)
+                folder for folder in self.to_sort_path.glob("*/") if not self.should_exclude(folder)
             ]
 
-    def get_files(self, folder: Optional[Path] = None) -> List[Path]:
+    def get_files(self, folder: Optional[Path] = None) -> list[Path]:
         """Get all files in the directory to sort or in a specific folder."""
         if folder is not None:
             return [
@@ -305,9 +300,7 @@ class FileOrganizer:
         for file in unsorted_files:
             file_date = self.get_file_date(file)
             year_folder = file.parent / f"{file_date.year}"
-            month_folder = (
-                year_folder / f"{file_date.month:02d}-{file_date.strftime('%B')}"
-            )
+            month_folder = year_folder / f"{file_date.month:02d}-{file_date.strftime('%B')}"
 
             self.move_file(file, month_folder)
             self.destination_folders.update({year_folder, month_folder})
@@ -315,13 +308,13 @@ class FileOrganizer:
 
         self.stats.method_stats["by_date"] = len(unsorted_files)
 
-    def sort_by_name(self, folder: Path = None) -> None:
+    def sort_by_name(self, folder: Optional[Path] = None) -> None:
         """Sort files by common stems in their names."""
         self.log_verbose(f"Starting sort by stem in {folder or 'all folders'}...")
         target_folder = folder or self.to_sort_path
 
         if self.recursive and folder is None:
-            folders_to_process = [self.to_sort_path] + self.get_folders()
+            folders_to_process = [self.to_sort_path, *self.get_folders()]
         else:
             folders_to_process = [target_folder]
 
@@ -353,9 +346,7 @@ class FileOrganizer:
                     files = stem_folders[common_stem]
                     if len(files) > 1:
                         for file in files:
-                            if file.exists() and not set(common_stem.split()) <= set(
-                                file.parts
-                            ):
+                            if file.exists() and not set(common_stem.split()) <= set(file.parts):
                                 stem_folder = file.parent / common_stem
                                 self.move_file(file, stem_folder)
                                 self.destination_folders.add(stem_folder)
@@ -382,9 +373,7 @@ class FileOrganizer:
             total=total_operations, desc="Organizing files", disable=not self.verbose
         )
 
-        logger.info(
-            f"Starting organization with methods: {[m.value for m in self.methods]}"
-        )
+        logger.info(f"Starting organization with methods: {[m.value for m in self.methods]}")
         logger.debug(f"Mode: {'Recursive' if self.recursive else 'Simple'}")
         logger.info(f"Dry run: {self.dry_run}")
 
@@ -405,14 +394,15 @@ class FileOrganizer:
             # 1. Existed before organization, AND
             # 2. Are now empty, AND
             # 3. Are not in our destination folders
-            current_folders = set(self.get_folders())
             empty_folders = set()
 
             for folder in original_folders:
-                if folder.exists() and folder not in self.destination_folders:
-                    # Check if folder is actually empty
-                    if not any(folder.iterdir()):
-                        empty_folders.add(folder)
+                if (
+                    folder.exists()
+                    and folder not in self.destination_folders
+                    and not any(folder.iterdir())
+                ):
+                    empty_folders.add(folder)
 
             self.remove_folders(empty_folders)
 
@@ -425,7 +415,7 @@ class FileOrganizer:
 
         return self.stats
 
-    def remove_folders(self, folders: Set[Path]) -> None:
+    def remove_folders(self, folders: set[Path]) -> None:
         """Move empty folders to trash."""
         if not folders:
             return
@@ -448,9 +438,7 @@ class FileOrganizer:
 
         if len(current_files) != self.stats.total_files:
             missing_files = self.stats.total_files - len(current_files)
-            logger.error(
-                f"Organization verification failed! {missing_files} files missing."
-            )
+            logger.error(f"Organization verification failed! {missing_files} files missing.")
             self.stats.errors += missing_files
         else:
             logger.info("Organization verification successful!")
@@ -478,7 +466,7 @@ class FileOrganizer:
         print("=" * 50)
 
 
-def split_stem(split_pattern: re.Pattern, stem: str) -> List[str]:
+def split_stem(split_pattern: re.Pattern, stem: str) -> list[str]:
     """Split a file stem using a regex pattern."""
     return [part for part in re.split(split_pattern, stem) if part]
 
@@ -490,27 +478,23 @@ def clean_stem(to_replace_pattern: re.Pattern, stem: str, replacement: str = "")
 
 def get_split_stem(
     split_pattern: re.Pattern, to_replace_pattern: re.Pattern, stem: str
-) -> List[str]:
+) -> list[str]:
     """Clean and split a file stem."""
     cleaned_stem = clean_stem(to_replace_pattern, stem)
     return split_stem(split_pattern, cleaned_stem)
 
 
-def get_common_stems(files: List[Path]) -> List[List[str]]:
+def get_common_stems(files: list[Path]) -> list[list[str]]:
     """Find common stems among file names."""
     if len(files) < 2:
         return []
 
-    file_stems = [
-        get_split_stem(SPLIT_PATTERN, TO_REPLACE_PATTERN, file.stem) for file in files
-    ]
+    file_stems = [get_split_stem(SPLIT_PATTERN, TO_REPLACE_PATTERN, file.stem) for file in files]
 
     common_stems = []
     for stem1, stem2 in combinations(file_stems, 2):
         common_words = [
-            x
-            for x, y in zip_longest(stem1, stem2, fillvalue=None)
-            if x == y and x is not None
+            x for x, y in zip_longest(stem1, stem2, fillvalue=None) if x == y and x is not None
         ]
         if common_words:
             common_stems.append(tuple(common_words))
@@ -523,7 +507,7 @@ def get_common_stems(files: List[Path]) -> List[List[str]]:
     ]
 
 
-def parse_methods(method_args: List[str]) -> List[SortMethod]:
+def parse_methods(method_args: list[str]) -> list[SortMethod]:
     """Parse method arguments into SortMethod enum values."""
     methods = []
     for method_str in method_args:
@@ -566,9 +550,7 @@ def main() -> None:
         action="store_true",
         help="Perform a dry run without actually moving files",
     )
-    parser.add_argument(
-        "--verbose", "-v", action="store_true", help="Enable verbose output"
-    )
+    parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output")
     parser.add_argument(
         "--exclude",
         nargs="*",
@@ -584,7 +566,7 @@ def main() -> None:
     # Parse methods
     methods = parse_methods(args.method)
 
-    logger.info(f"Starting Enhanced File Organizer")
+    logger.info("Starting Enhanced File Organizer")
     logger.info(f"Methods: {[m.value for m in methods]}")
     logger.info(f"Recursive: {recursive}")
     logger.info(f"Dry run: {args.dry_run}")

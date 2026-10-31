@@ -4,10 +4,9 @@ FastAPI + React Project Generator
 Automates the creation of a full-stack project with FastAPI backend and React frontend.
 """
 
-import os
 import sys
-from pathlib import Path
 import textwrap
+from pathlib import Path
 
 try:
     from automations_cli.versions import NODE_ENGINES, NODE_MAJOR, NODE_TYPES_SPEC
@@ -18,7 +17,7 @@ except ImportError:  # imported as a top-level module via sys.path.append
 def create_file(filepath: Path, content: str):
     """Create a file with the given content, creating parent directories if needed."""
     filepath.parent.mkdir(parents=True, exist_ok=True)
-    filepath.write_text(textwrap.dedent(content).strip() + "\n", encoding='utf-8')
+    filepath.write_text(textwrap.dedent(content).strip() + "\n", encoding="utf-8")
     print(f"[OK] Created: {filepath}")
 
 
@@ -31,7 +30,9 @@ def create_backend(root: Path, project_name: str):
     src_app = backend / "src" / package_name
 
     # pyproject.toml
-    create_file(backend / "pyproject.toml", f"""
+    create_file(
+        backend / "pyproject.toml",
+        f"""
     [build-system]
     requires = ["hatchling"]
     build-backend = "hatchling.build"
@@ -67,22 +68,31 @@ def create_backend(root: Path, project_name: str):
 
     [tool.hatch.build.targets.wheel]
     packages = ["src/{package_name}"]
-    """)
+    """,
+    )
 
     # .env
-    create_file(backend / ".env", f"""
+    create_file(
+        backend / ".env",
+        f"""
     DATABASE_URL=sqlite:///./{project_name}.db
     SECRET_KEY=your-secret-key-change-in-production
     DEBUG=True
-    """)
+    """,
+    )
 
     # src/{project_name}/__init__.py
-    create_file(src_app / "__init__.py", """
+    create_file(
+        src_app / "__init__.py",
+        """
     __version__ = "0.1.0"
-    """)
+    """,
+    )
 
     # src/{project_name}/main.py
-    create_file(src_app / "main.py", f"""
+    create_file(
+        src_app / "main.py",
+        f"""
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
     from {package_name}.core.config import settings
@@ -109,7 +119,8 @@ def create_backend(root: Path, project_name: str):
     @app.get("/")
     async def root():
         return {{"message": "Welcome to FastAPI Backend", "version": "0.1.0"}}
-    """)
+    """,
+    )
 
     # src/{project_name}/scripts.py - Development and deployment scripts
     scripts_content = f'''
@@ -195,7 +206,9 @@ if __name__ == "__main__":
     create_file(src_app / "core" / "__init__.py", "")
 
     # src/{project_name}/core/config.py
-    create_file(src_app / "core" / "config.py", f"""
+    create_file(
+        src_app / "core" / "config.py",
+        f"""
     from pydantic_settings import BaseSettings, SettingsConfigDict
 
     class Settings(BaseSettings):
@@ -209,7 +222,8 @@ if __name__ == "__main__":
         )
 
     settings = Settings()
-    """)
+    """,
+    )
 
     # src/{project_name}/db/__init__.py
     create_file(src_app / "db" / "__init__.py", "")
@@ -242,7 +256,7 @@ if __name__ == "__main__":
     create_file(src_app / "models" / "__init__.py", "")
 
     # Create the content as a variable to avoid f-string + triple quote issues
-    models_base_content = f'''
+    models_base_content = f"""
     from sqlalchemy import Column, Integer, DateTime
     from datetime import datetime
     from {package_name}.db.database import Base
@@ -262,14 +276,14 @@ if __name__ == "__main__":
     #     email = Column(String, unique=True, index=True, nullable=False)
     #     username = Column(String, unique=True, index=True, nullable=False)
     #     hashed_password = Column(String, nullable=False)
-    '''
+    """
     create_file(src_app / "models" / "base.py", models_base_content)
 
     # src/{project_name}/schemas/__init__.py
     create_file(src_app / "schemas" / "__init__.py", "")
 
     # Create the schemas/health.py content as a variable
-    schemas_health_content = f'''
+    schemas_health_content = """
     from pydantic import BaseModel
     from datetime import datetime
 
@@ -280,13 +294,13 @@ if __name__ == "__main__":
         service: str
 
         class Config:
-            json_schema_extra = {{
-                "example": {{
+            json_schema_extra = {
+                "example": {
                     "status": "healthy",
                     "timestamp": "2024-01-01T00:00:00",
                     "service": "FastAPI Backend"
-                }}
-            }}
+                }
+            }
 
     # Example schemas - uncomment and modify as needed
     # class UserBase(BaseModel):
@@ -302,14 +316,14 @@ if __name__ == "__main__":
     #
     #     class Config:
     #         from_attributes = True
-    '''
+    """
     create_file(src_app / "schemas" / "health.py", schemas_health_content)
 
     # src/{project_name}/routers/__init__.py
     create_file(src_app / "routers" / "__init__.py", "")
 
     # Create the routers/health.py content as a variable
-    routers_health_content = f'''
+    routers_health_content = f"""
     from fastapi import APIRouter
     from datetime import datetime
     from {package_name}.schemas.health import HealthResponse
@@ -324,11 +338,13 @@ if __name__ == "__main__":
             timestamp=datetime.utcnow(),
             service="FastAPI Backend"
         )
-    '''
+    """
     create_file(src_app / "routers" / "health.py", routers_health_content)
 
     # Sample test so `uv run pytest` (and CI's backend job) is green on day one
-    create_file(backend / "tests" / "test_health.py", f"""
+    create_file(
+        backend / "tests" / "test_health.py",
+        f"""
     from fastapi.testclient import TestClient
 
     from {package_name}.main import app
@@ -345,14 +361,15 @@ if __name__ == "__main__":
     def test_root():
         response = client.get("/")
         assert response.status_code == 200
-    """)
+    """,
+    )
 
 
 def create_frontend(root: Path):
     """Create the React frontend with Vite, TypeScript, Tailwind CSS, and shadcn/ui."""
     frontend = root / "frontend"
     src = frontend / "src"
-    
+
     # Create directory structure
     (src / "components" / "ui").mkdir(parents=True, exist_ok=True)
     (src / "lib").mkdir(parents=True, exist_ok=True)
@@ -360,7 +377,9 @@ def create_frontend(root: Path):
     (frontend / "public").mkdir(parents=True, exist_ok=True)
 
     # package.json
-    create_file(frontend / "package.json", f"""
+    create_file(
+        frontend / "package.json",
+        f"""
     {{
       "name": "frontend",
       "private": true,
@@ -409,10 +428,13 @@ def create_frontend(root: Path):
         "vitest": "^3.2.7"
       }}
     }}
-    """)
+    """,
+    )
 
     # vite.config.ts
-    create_file(frontend / "vite.config.ts", """
+    create_file(
+        frontend / "vite.config.ts",
+        """
     /// <reference types="vitest/config" />
     import { defineConfig } from "vite";
     import react from "@vitejs/plugin-react-swc";
@@ -439,14 +461,20 @@ def create_frontend(root: Path):
         setupFiles: ["./src/test/setup.ts"],
       },
     });
-    """)
+    """,
+    )
 
     # vitest setup + a smoke test so `npm test` is green on day one
-    create_file(src / "test" / "setup.ts", """
+    create_file(
+        src / "test" / "setup.ts",
+        """
     import "@testing-library/jest-dom/vitest";
-    """)
+    """,
+    )
 
-    create_file(src / "App.test.tsx", """
+    create_file(
+        src / "App.test.tsx",
+        """
     import { describe, expect, it, vi } from "vitest";
     import { render, screen } from "@testing-library/react";
     import App from "./App";
@@ -470,10 +498,13 @@ def create_frontend(root: Path):
         expect(await screen.findByText("FastAPI + React")).toBeInTheDocument();
       });
     });
-    """)
+    """,
+    )
 
     # tsconfig.json
-    create_file(frontend / "tsconfig.json", """
+    create_file(
+        frontend / "tsconfig.json",
+        """
     {
       "files": [],
       "references": [
@@ -487,10 +518,13 @@ def create_frontend(root: Path):
         }
       }
     }
-    """)
+    """,
+    )
 
     # tsconfig.app.json
-    create_file(frontend / "tsconfig.app.json", """
+    create_file(
+        frontend / "tsconfig.app.json",
+        """
     {
       "compilerOptions": {
         "composite": true,
@@ -516,10 +550,13 @@ def create_frontend(root: Path):
       },
       "include": ["src"]
     }
-    """)
+    """,
+    )
 
     # tsconfig.node.json
-    create_file(frontend / "tsconfig.node.json", """
+    create_file(
+        frontend / "tsconfig.node.json",
+        """
     {
       "compilerOptions": {
         "composite": true,
@@ -539,10 +576,13 @@ def create_frontend(root: Path):
       },
       "include": ["vite.config.ts"]
     }
-    """)
+    """,
+    )
 
     # .eslintrc.cjs — without it `npm run lint` fails with "no configuration"
-    create_file(frontend / ".eslintrc.cjs", """
+    create_file(
+        frontend / ".eslintrc.cjs",
+        """
     module.exports = {
       root: true,
       env: { browser: true, es2020: true },
@@ -558,15 +598,21 @@ def create_frontend(root: Path):
         'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
       },
     };
-    """)
+    """,
+    )
 
     # vite-env.d.ts
-    create_file(frontend / "vite-env.d.ts", """
+    create_file(
+        frontend / "vite-env.d.ts",
+        """
     /// <reference types="vite/client" />
-    """)
+    """,
+    )
 
     # tailwind.config.ts
-    create_file(frontend / "tailwind.config.ts", """
+    create_file(
+        frontend / "tailwind.config.ts",
+        """
     import type { Config } from "tailwindcss";
 
     const config: Config = {
@@ -647,20 +693,26 @@ def create_frontend(root: Path):
     };
 
     export default config;
-    """)
+    """,
+    )
 
     # postcss.config.js
-    create_file(frontend / "postcss.config.js", """
+    create_file(
+        frontend / "postcss.config.js",
+        """
     export default {
       plugins: {
         tailwindcss: {},
         autoprefixer: {},
       },
     };
-    """)
+    """,
+    )
 
     # components.json (shadcn/ui)
-    create_file(frontend / "components.json", """
+    create_file(
+        frontend / "components.json",
+        """
     {
       "$schema": "https://ui.shadcn.com/schema.json",
       "style": "default",
@@ -681,10 +733,13 @@ def create_frontend(root: Path):
         "hooks": "@/hooks"
       }
     }
-    """)
+    """,
+    )
 
     # index.html
-    create_file(frontend / "index.html", """
+    create_file(
+        frontend / "index.html",
+        """
     <!DOCTYPE html>
     <html lang="en">
       <head>
@@ -697,10 +752,13 @@ def create_frontend(root: Path):
         <script type="module" src="/src/main.tsx"></script>
       </body>
     </html>
-    """)
+    """,
+    )
 
     # src/index.css (with Tailwind and shadcn/ui CSS variables)
-    create_file(src / "index.css", """
+    create_file(
+        src / "index.css",
+        """
     @tailwind base;
     @tailwind components;
     @tailwind utilities;
@@ -760,10 +818,13 @@ def create_frontend(root: Path):
         @apply bg-background text-foreground;
       }
     }
-    """)
+    """,
+    )
 
     # src/main.tsx
-    create_file(src / "main.tsx", """
+    create_file(
+        src / "main.tsx",
+        """
     import { StrictMode } from "react";
     import { createRoot } from "react-dom/client";
     import App from "./App";
@@ -774,20 +835,26 @@ def create_frontend(root: Path):
         <App />
       </StrictMode>
     );
-    """)
+    """,
+    )
 
     # src/lib/utils.ts (shadcn/ui utility)
-    create_file(src / "lib" / "utils.ts", """
+    create_file(
+        src / "lib" / "utils.ts",
+        """
     import { type ClassValue, clsx } from "clsx";
     import { twMerge } from "tailwind-merge";
 
     export function cn(...inputs: ClassValue[]) {
       return twMerge(clsx(inputs));
     }
-    """)
+    """,
+    )
 
     # src/integrations/api.ts (Type-safe API client)
-    create_file(src / "integrations" / "api.ts", """
+    create_file(
+        src / "integrations" / "api.ts",
+        """
     import axios from "axios";
 
     export const api = axios.create({
@@ -806,10 +873,13 @@ def create_frontend(root: Path):
     export const healthApi = {
       check: () => api.get<HealthResponse>("/health"),
     };
-    """)
+    """,
+    )
 
     # src/components/ui/button.tsx (shadcn/ui Button component)
-    create_file(src / "components" / "ui" / "button.tsx", """
+    create_file(
+        src / "components" / "ui" / "button.tsx",
+        """
     import * as React from "react";
     import { Slot } from "@radix-ui/react-slot";
     import { cva, type VariantProps } from "class-variance-authority";
@@ -865,10 +935,13 @@ def create_frontend(root: Path):
     Button.displayName = "Button";
 
     export { Button, buttonVariants };
-    """)
+    """,
+    )
 
     # src/components/ui/card.tsx (shadcn/ui Card component)
-    create_file(src / "components" / "ui" / "card.tsx", """
+    create_file(
+        src / "components" / "ui" / "card.tsx",
+        """
     import * as React from "react";
     import { cn } from "@/lib/utils";
 
@@ -947,10 +1020,13 @@ def create_frontend(root: Path):
     CardFooter.displayName = "CardFooter";
 
     export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent };
-    """)
+    """,
+    )
 
     # src/App.tsx
-    create_file(src / "App.tsx", """
+    create_file(
+        src / "App.tsx",
+        """
     import { useState, useEffect } from "react";
     import { healthApi, type HealthResponse } from "@/integrations/api";
     import { Button } from "@/components/ui/button";
@@ -1028,7 +1104,8 @@ def create_frontend(root: Path):
     }
 
     export default App;
-    """)
+    """,
+    )
 
     # Create public directory (already created above, but keeping for consistency)
     (frontend / "public").mkdir(parents=True, exist_ok=True)
@@ -1129,7 +1206,9 @@ def create_docker_compose(root: Path, project_name: str):
     """Create docker-compose.yml for PostgreSQL."""
     db_name = project_name.replace("-", "_")
 
-    create_file(root / "docker-compose.yml", f"""
+    create_file(
+        root / "docker-compose.yml",
+        f"""
     services:
       db:
         image: postgres:16-alpine
@@ -1152,12 +1231,15 @@ def create_docker_compose(root: Path, project_name: str):
     volumes:
       postgres_data:
         name: {project_name}-postgres-data
-    """)
+    """,
+    )
 
 
 def create_frontend_readme(root: Path):
     """Create frontend README with setup instructions."""
-    create_file(root / "frontend" / "README.md", """
+    create_file(
+        root / "frontend" / "README.md",
+        """
 # Frontend
 
 React + TypeScript + Vite + Tailwind CSS + shadcn/ui
@@ -1276,15 +1358,18 @@ import { cn } from "@/lib/utils";
 - **TypeScript**: `tsconfig.json` - TypeScript config
 - **Tailwind**: `tailwind.config.ts` - Theme and plugins
 - **shadcn/ui**: `components.json` - Component config
-""")
+""",
+    )
 
 
 def create_readme(root: Path, project_name: str):
     """Create README with setup instructions."""
     # Convert project name to display format (replace hyphens with spaces, title case)
     display_name = project_name.replace("-", " ").title()
-    
-    create_file(root / "README.md", f"""
+
+    create_file(
+        root / "README.md",
+        f"""
 # {display_name}
 
 Full-stack application with FastAPI backend and React frontend.
@@ -1402,7 +1487,8 @@ Both servers support hot-reloading. Make changes to the code and see them reflec
   publishes images to ghcr.io on main. It needs backend/uv.lock and
   frontend/package-lock.json committed — both are bootstrapped at generation.
 - Node.js {NODE_MAJOR} is required (see frontend/package.json engines)
-""")
+""",
+    )
 
 
 def main(project_name: str = "my-fullstack-app", compose: bool = False, local: bool = False):
@@ -1417,8 +1503,10 @@ def main(project_name: str = "my-fullstack-app", compose: bool = False, local: b
     # Use current working directory as the project root (already set by project_generator)
     root = Path.cwd()
 
-    if (root / 'backend').exists() or (root / 'frontend').exists():
-        print(f"\n[WARN] Backend or frontend directory already exists in current location. Overwrite? Skipping creation.")
+    if (root / "backend").exists() or (root / "frontend").exists():
+        print(
+            "\n[WARN] Backend or frontend directory already exists in current location. Overwrite? Skipping creation."
+        )
         return
 
     print(f"\n[INFO] Creating fullstack project: {project_name}")
@@ -1471,28 +1559,37 @@ DEBUG=True
     print("     Also: ./dev db-up | db-down | logs | status | backup | restore | nuke")
     if local:
         print("\n  ./prod deploy")
-        print("     LAN deploy over HTTPS. Copy .env.prod.example to .env.prod and fill it in first.")
-        print("     Also: ./prod build | pull | up | down | logs | status | backup | restore | offsite-sync | tls | nuke")
-    print(f"\n  Or manually:")
-    print(f"\n  1. Backend setup:")
-    print(f"     cd backend")
-    print(f"     uv sync")
-    print(f"     uv run dev")
-    print(f"\n  2. Frontend setup (in a new terminal):")
-    print(f"     cd frontend")
-    print(f"     npm install")
-    print(f"     npm run dev")
-    print(f"\n  3. Open http://localhost:5173 in your browser")
-    print(f"\n[INFO] Check README.md for more details")
+        print(
+            "     LAN deploy over HTTPS. Copy .env.prod.example to .env.prod and fill it in first."
+        )
+        print(
+            "     Also: ./prod build | pull | up | down | logs | status | backup | restore | offsite-sync | tls | nuke"
+        )
+    print("\n  Or manually:")
+    print("\n  1. Backend setup:")
+    print("     cd backend")
+    print("     uv sync")
+    print("     uv run dev")
+    print("\n  2. Frontend setup (in a new terminal):")
+    print("     cd frontend")
+    print("     npm install")
+    print("     npm run dev")
+    print("\n  3. Open http://localhost:5173 in your browser")
+    print("\n[INFO] Check README.md for more details")
     print("\n" + "=" * 60)
 
 
 if __name__ == "__main__":
     try:
         import argparse
+
         parser = argparse.ArgumentParser(description="Create a fullstack FastAPI + React project")
-        parser.add_argument("project_name", nargs="?", default="my-fullstack-app", help="Name of the project")
-        parser.add_argument("--compose", action="store_true", help="Generate docker-compose.yml for PostgreSQL")
+        parser.add_argument(
+            "project_name", nargs="?", default="my-fullstack-app", help="Name of the project"
+        )
+        parser.add_argument(
+            "--compose", action="store_true", help="Generate docker-compose.yml for PostgreSQL"
+        )
         parser.add_argument(
             "--local",
             action="store_true",

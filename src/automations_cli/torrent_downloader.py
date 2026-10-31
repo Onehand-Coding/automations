@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
+import argparse
+import configparser
 import re
+import select
+import signal
+import subprocess
 import sys
 import time
-import signal
-import select
-import argparse
-import subprocess
-import configparser
 from pathlib import Path
 
 try:
-    from helper.configs import setup_logging, CONFIG_DIR
+    from helper.configs import CONFIG_DIR, setup_logging
 except ImportError:
     from .helper.configs import setup_logging
 
@@ -134,7 +134,9 @@ def parse_aria2c_progress(line, verbose=False):
     if verbose:
         logger.info(f"Raw line: {line}")
 
-    seeding_pattern = r"\[#[a-f0-9]{6}\s+SEED\((.+?)\)\s+CN:(\d+)\s+SD:(\d+)\s+UL:([^\s]+)\(([^)]+)\)\]"
+    seeding_pattern = (
+        r"\[#[a-f0-9]{6}\s+SEED\((.+?)\)\s+CN:(\d+)\s+SD:(\d+)\s+UL:([^\s]+)\(([^)]+)\)\]"
+    )
     base_pattern = r"\[#[a-f0-9]{6}\s+(.+?)\s+CN:(\d+)\s+SD:(\d+)(?:\s+DL:([^\s]+))?(?:\s+UL:([^\s]+))?(?:\s+ETA:([^\]]+))?\]"
 
     match = re.match(seeding_pattern, line)
@@ -194,9 +196,7 @@ def main():
     )
 
     # Define the positional argument for torrents separately.
-    parser.add_argument(
-        "torrents", nargs="*", help="One or more .torrent files or magnet links."
-    )
+    parser.add_argument("torrents", nargs="*", help="One or more .torrent files or magnet links.")
 
     # Keep the mutually exclusive group for actions only.
     action_group = parser.add_mutually_exclusive_group()
@@ -207,9 +207,7 @@ def main():
         "--resume", action="store_true", help="Resume all downloads in the session."
     )
 
-    parser.add_argument(
-        "--output-dir", "-o", help="Directory to save the downloaded files."
-    )
+    parser.add_argument("--output-dir", "-o", help="Directory to save the downloaded files.")
     parser.add_argument(
         "--seed", action="store_true", help="Continue seeding after download completes."
     )
@@ -219,26 +217,18 @@ def main():
         type=int,
         help="Maximum number of connections per server (1-16).",
     )
-    parser.add_argument(
-        "--max-download", "-d", help="Maximum download speed (e.g., 1M, 500K)."
-    )
+    parser.add_argument("--max-download", "-d", help="Maximum download speed (e.g., 1M, 500K).")
     parser.add_argument(
         "--max-upload", "-u", help="Maximum upload speed (e.g., 500K, 0 for unlimited)."
     )
-    parser.add_argument(
-        "--session", help="Path to aria2c session file for pause/resume."
-    )
-    parser.add_argument(
-        "--quiet", action="store_true", help="Suppress detailed progress output."
-    )
+    parser.add_argument("--session", help="Path to aria2c session file for pause/resume.")
+    parser.add_argument("--quiet", action="store_true", help="Suppress detailed progress output.")
     parser.add_argument(
         "--create-config",
         action="store_true",
         help="Create a default configuration file and exit.",
     )
-    parser.add_argument(
-        "--verbose", "-v", action="store_true", help="Enable verbose output."
-    )
+    parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output.")
 
     args = parser.parse_args()
 
@@ -259,15 +249,15 @@ def main():
 
     # Check if any action was specified
     if not any([args.torrents, args.pause, args.resume]):
-        error_msg = "You must provide at least one .torrent file/magnet link, or use --pause/--resume."
+        error_msg = (
+            "You must provide at least one .torrent file/magnet link, or use --pause/--resume."
+        )
         print(f"❌ Error: {error_msg}", file=sys.stderr)
         parser.print_help()
         sys.exit(1)
 
     config = load_torrent_config()
-    output_dir = args.output_dir or config.get(
-        "output_dir", TORRENT_DEFAULT_CONFIG["output_dir"]
-    )
+    output_dir = args.output_dir or config.get("output_dir", TORRENT_DEFAULT_CONFIG["output_dir"])
     max_connections = args.max_connections or int(config.get("max_connections", 16))
     max_download = args.max_download or config.get("max_download", "")
     max_upload = args.max_upload or config.get("max_upload", "")
@@ -309,9 +299,7 @@ def main():
     if use_session:
         try:
             ensure_session_file(session_file)
-            aria2_args.extend(
-                ["--save-session", session_file, "--input-file", session_file]
-            )
+            aria2_args.extend(["--save-session", session_file, "--input-file", session_file])
             logger.debug(f"Using session file: {session_file}")
         except Exception as e:
             error_msg = f"Failed to setup session file: {e}"
@@ -366,9 +354,7 @@ def main():
         print("🚀 Torrent Download Started")
         print("=" * 50)
         if valid_torrents:
-            for i, name in enumerate(
-                [parse_torrent_name(t) for t in valid_torrents], 1
-            ):
+            for i, name in enumerate([parse_torrent_name(t) for t in valid_torrents], 1):
                 print(f"📄 [{i}] {name}")
         print(f"📁 Output: {output_dir}")
         if max_download or max_upload:
@@ -399,7 +385,7 @@ def main():
         try:
             if "process" in locals() and process.poll() is None:
                 process.terminate()
-        except:
+        except Exception:
             pass
         sys.exit(130)
 
@@ -482,9 +468,7 @@ def main():
                         else "0B"
                     )
                     eta = (
-                        format_time(progress_data["eta"].strip())
-                        if progress_data["eta"]
-                        else None
+                        format_time(progress_data["eta"].strip()) if progress_data["eta"] else None
                     )
                     torrent_id = line.split()[0].strip("[]")
 

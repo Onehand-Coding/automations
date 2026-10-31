@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-import sys
-import shutil
 import argparse
+import shutil
 import subprocess
+import sys
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional
 from urllib.parse import urlparse
 
 try:
@@ -65,7 +65,7 @@ def parse_aria2c_progress(line):
 
 
 def download_with_aria2(
-    urls: List[str],
+    urls: list[str],
     output_dir: Path,
     output_name: Optional[str] = None,
     resume: bool = True,
@@ -103,7 +103,6 @@ def download_with_aria2(
             universal_newlines=True,
             bufsize=1,
         )
-        last_progress = None
         for line in iter(process.stdout.readline, ""):
             line = line.strip()
             if not line:
@@ -115,7 +114,6 @@ def download_with_aria2(
                     end="",
                     flush=True,
                 )
-                last_progress = progress
         process.wait()
         if not quiet:
             print()  # Newline after progress
@@ -156,7 +154,7 @@ def download_with_wget(
     print(f"📥 Downloading with wget: {url}")
 
     try:
-        result = subprocess.run(command, check=True, capture_output=not quiet)
+        subprocess.run(command, check=True, capture_output=not quiet)
         logger.info("Download completed successfully")
         print(f"✅ Download complete: {output_path}")
         return True
@@ -187,7 +185,7 @@ def download_with_curl(
     print(f"📥 Downloading with curl: {url}")
 
     try:
-        result = subprocess.run(command, check=True, capture_output=not quiet)
+        subprocess.run(command, check=True, capture_output=not quiet)
         logger.info("Download completed successfully")
         print(f"✅ Download complete: {output_path}")
         return True
@@ -198,7 +196,7 @@ def download_with_curl(
 
 
 def download_files(
-    urls: List[str],
+    urls: list[str],
     output_name: Optional[str] = None,
     output_dir: Optional[str] = None,
     method: str = "auto",
@@ -240,23 +238,21 @@ def download_files(
             return
 
     # Otherwise, loop over URLs and use wget/curl with fallback
-    for i, url in enumerate(urls):
+    for url in urls:
         name = output_name if output_name and len(urls) == 1 else None
         # Try each method in order
         for m in [method] if method != "auto" else ["wget", "curl"]:
             if m == "wget":
                 success = download_with_wget(
                     url,
-                    output_dir_path
-                    / (name or Path(urlparse(url).path).name or "downloaded_file"),
+                    output_dir_path / (name or Path(urlparse(url).path).name or "downloaded_file"),
                     resume,
                     quiet,
                 )
             elif m == "curl":
                 success = download_with_curl(
                     url,
-                    output_dir_path
-                    / (name or Path(urlparse(url).path).name or "downloaded_file"),
+                    output_dir_path / (name or Path(urlparse(url).path).name or "downloaded_file"),
                     resume,
                     quiet,
                 )
@@ -270,9 +266,7 @@ def download_files(
             print(f"❌ {error_msg}", file=sys.stderr)
             continue
 
-        file_path = output_dir_path / (
-            name or Path(urlparse(url).path).name or "downloaded_file"
-        )
+        file_path = output_dir_path / (name or Path(urlparse(url).path).name or "downloaded_file")
         if file_path.exists():
             size = file_path.stat().st_size
             size_mb = size / (1024 * 1024)

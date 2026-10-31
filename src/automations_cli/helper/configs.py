@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-import sys
 import logging
+import sys
 from pathlib import Path
 
 
@@ -42,9 +42,7 @@ CONFIG_DIR = Path.home() / ".config" / "automations"
 CONFIG_DIR.mkdir(exist_ok=True, parents=True)
 
 
-def setup_logging(
-    log_level: str = "DEBUG", log_file: str = "script.log"
-) -> logging.Logger:
+def setup_logging(log_level: str = "DEBUG", log_file: str = "script.log") -> logging.Logger:
     """Set up comprehensive logging configuration."""
     if not isinstance(log_file, Path):
         log_file = LOG_DIR / log_file
