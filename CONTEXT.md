@@ -33,6 +33,7 @@ A Python CLI tool for automating development and file management tasks — proje
 - `./prod up` enforces chmod 600 .env.prod + mkdir/chown ./backups per docs/local-deploy-standard.md
 
 ### Key Decisions
+- Exit codes are contractual: a script must `sys.exit(nonzero)` on failure, and `_run_script` propagates the child's code (signal deaths map to `128 + signal`, so SIGINT stays 130). Previously every command exited 0, which would have hidden failed backups in cron. `pg-backup` returns 1 for backup, upload, and restore failures; `list` returns 0 for an empty directory and 1 when the directory is missing.
 - Short flags: `-f` = fullstack, `-F` = flutter, `-c` = compose
 - Sublime venv param: `backend_in_subdir=True` (generic, covers both flavors)
 - Flutter arch: feature-first (Riverpod providers, GoRouter shell routes, Dio API client)
@@ -55,6 +56,13 @@ A Python CLI tool for automating development and file management tasks — proje
 - Reworked generator devops layer: dev/prod default, Node 24 constant, CI workflow emission, vitest+pytest day-one tests, vite ^6, eslint config fix (lint was silently broken before), flutter flavor parity
 - Pinned FLUTTER_BUILD_IMAGE to cirruslabs/flutter:3.44.0 (registry-verified) and added pwdims-style trivy image-scan gating ghcr publish to both CI templates
 - Verified end-to-end: bash -n, uv sync --frozen + pytest (both flavors), npm ci/lint/test/build, compose config, standards-repo parity checker (only expected sidecar gaps), CI YAML parse with image-scan→cd chain
+
+### pg-backup (PostgreSQL dump/restore)
+- `pg_dump`/`pg_restore` come from PATH, falling back to `docker run postgres:17-alpine` (pinned image; its major must be >= the server's) so no local client install and no sudo are needed. The fallback uses `--network host` so `localhost` URLs and VPN/tailscale DNS resolve from inside the container.
+- Dumps stream to stdout and Python writes the file, so the dump is owned by the invoking user and chmod 0600. A failed dump is deleted instead of left behind as a truncated `.dump` that `list`/restore would treat as valid.
+- rclone remote names are normalized by stripping the trailing colon that `rclone listremotes` prints. Without it, `remote:` + `DB_Backups` becomes `remote::DB_Backups`, which uploads into a folder literally named `:DB_Backups`.
+- Supabase: `db.<ref>.supabase.co:5432` is IPv6-only and fails with "Network is unreachable" on IPv4-only hosts. Use the session pooler (`aws-0-<region>.pooler.supabase.com:5432`) for pg_dump/pg_restore. The transaction pooler on 6543 cannot run dumps.
+- A Supabase dump also carries internal schemas (auth/storage/realtime) owned by supabase_admin roles. Restoring into plain Postgres reports a few ignored errors for those objects, but every `public` app table and its rows restore correctly (verified by row-count comparison).
 
 ### Takeout Gotchas
 - Requires `exiftool` on PATH (Fedora: `dnf install perl-Image-ExifTool`)

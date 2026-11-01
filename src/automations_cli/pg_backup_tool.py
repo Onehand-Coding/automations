@@ -13,7 +13,10 @@ from email.mime.text import MIMEText
 from pathlib import Path
 
 from dotenv import load_dotenv
-from helper import DATA_DIR, setup_logging
+
+# Sibling module: resolved at runtime because the CLI runs this file as a script
+# with its own directory on sys.path.
+from helper import DATA_DIR, setup_logging  # pyright: ignore[reportMissingImports]
 
 # --- Google Drive Upload Imports ---
 try:
@@ -25,6 +28,8 @@ try:
 
     GOOGLE_LIBS_AVAILABLE = True
 except ImportError:
+    # Keep the names bound so type checkers agree with the availability flag.
+    Request = InstalledAppFlow = build = MediaFileUpload = None
     GOOGLE_LIBS_AVAILABLE = False
 # --- End Google Drive Upload Imports ---
 
@@ -36,6 +41,16 @@ load_dotenv()
 CREDENTIALS_DIR = DATA_DIR / "backup-tool"
 BACKUP_DB_DIR = CREDENTIALS_DIR / "db"
 DEFAULT_RCLONE_TARGET_DIR = "DB_Backups"
+
+
+def normalize_rclone_remote(name):
+    """Strip the trailing colon rclone prints in `rclone listremotes`.
+
+    Without this, 'remote:' plus the target path becomes 'remote::DB_Backups',
+    which silently uploads into a folder literally named ':DB_Backups'.
+    """
+    return name.rstrip(":") if name else name
+
 
 # GDrive constants
 GDRIVE_TOKEN_FILE = CREDENTIALS_DIR / "token.pickle"  # Assume token in data dir
@@ -121,7 +136,6 @@ def download_latest_from_rclone(rclone_remote_name, remote_dir_name, local_dest_
 
     except json.JSONDecodeError as e:
         logger.error(f"Failed to parse rclone lsjson output: {e}")
-        logger.debug("rclone stdout for lsjson:\n%s", result.stdout)
         send_notification("rclone Restore Failed", "Failed to parse rclone output.")
         return None
     except subprocess.CalledProcessError as e:
@@ -203,12 +217,18 @@ def upload_to_gdrive(local_file_path, target_filename=None):
 
     logger.info(f"Attempting upload via Google Drive API for file: {local_file_path.name}")
     creds = None
+    if Request is None or InstalledAppFlow is None:
+        logger.error("GDrive upload requires google-auth and google-auth-oauthlib installed.")
+        return False
 
     # --- Credential Handling (from gdrive_uploader.py) ---
     if GDRIVE_TOKEN_FILE.exists():
         try:
             with open(GDRIVE_TOKEN_FILE, "rb") as token:
-                creds = pickle.load(token)
+                # pi-lens-ignore: python-insecure-deserialization
+                creds = pickle.load(
+                    token
+                )  # nosemgrep: python.lang.security.deserialization.pickle.avoid-pickle
             logger.debug("Loaded GDrive credentials from token file.")
         except Exception as e:
             logger.warning(
@@ -281,7 +301,9 @@ def upload_to_gdrive(local_file_path, target_filename=None):
         # Save the credentials for the next run
         try:
             with open(GDRIVE_TOKEN_FILE, "wb") as token:
-                pickle.dump(creds, token)
+                pickle.dump(
+                    creds, token
+                )  # nosemgrep: python.lang.security.deserialization.pickle.avoid-pickle
             logger.info(f"GDrive credentials saved to '{GDRIVE_TOKEN_FILE}'")
         except Exception as e:
             logger.error(f"Failed to save GDrive token to '{GDRIVE_TOKEN_FILE}': {e}")
@@ -291,9 +313,15 @@ def upload_to_gdrive(local_file_path, target_filename=None):
 
     try:
         # Build the Drive v3 service
+        if build is None or MediaFileUpload is None:
+            logger.error("GDrive upload requires google-api-python-client installed.")
+            return False
         logger.info("Building Google Drive service...")
         service = build(
-            "drive", "v3", credentials=creds, static_discovery=False
+            "drive",
+            "v3",
+            credentials=creds,
+            static_discovery=False,  # pyright: ignore[reportCallIssue]
         )  # static_discovery=False can help sometimes
 
         # Prepare file metadata and media body
@@ -328,6 +356,63 @@ def upload_to_gdrive(local_file_path, target_filename=None):
         return False
 
 
+# --- PostgreSQL Client Resolution ---
+# Docker image used when pg_dump/pg_restore are not installed locally.
+# Its major version must be >= the server's, so keep it up to date.
+PG_CLIENT_IMAGE = "postgres:17-alpine"
+CONTAINER_BACKUP_MOUNT = "/pg_backup"
+
+
+def _docker_ready():
+    """Return True when a usable Docker daemon is reachable."""
+    if shutil.which("docker") is None:
+        return False
+    try:
+        result = subprocess.run(
+            ["docker", "info", "--format", "{{.ServerVersion}}"],
+            capture_output=True,
+            timeout=20,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return result.returncode == 0
+
+
+def _pg_client(tool, host_dir=None):
+    """Resolve a PostgreSQL client tool to a command prefix and path mapper.
+
+    Prefers the locally installed binary and falls back to the pinned Docker
+    image, so backups work without installing PostgreSQL client packages.
+    """
+    if shutil.which(tool):
+        return [tool], Path
+    if not _docker_ready():
+        raise FileNotFoundError(
+            f"'{tool}' is not installed and Docker is unavailable. Install the PostgreSQL "
+            f"client tools (e.g. 'sudo dnf install postgresql') or start Docker."
+        )
+    logger.info(f"'{tool}' not found on PATH; using '{PG_CLIENT_IMAGE}' via Docker.")
+    # Host networking keeps localhost DB URLs and VPN/DNS resolution working.
+    prefix = ["docker", "run", "--rm", "-i", "--network", "host"]
+    if host_dir is not None:
+        prefix += ["-v", f"{host_dir}:{CONTAINER_BACKUP_MOUNT}:ro"]
+    prefix += [PG_CLIENT_IMAGE, tool]
+
+    def to_container_path(path):
+        return Path(CONTAINER_BACKUP_MOUNT) / Path(path).name
+
+    return prefix, to_container_path
+
+
+def _decode(output):
+    """Decode subprocess output that may be bytes or str."""
+    if not output:
+        return ""
+    if isinstance(output, bytes):
+        return output.decode("utf-8", errors="replace")
+    return output
+
+
 # --- Backup Functions ---
 def create_backup(db_url, backup_dir=BACKUP_DB_DIR):
     """Create a PostgreSQL backup"""
@@ -337,34 +422,40 @@ def create_backup(db_url, backup_dir=BACKUP_DB_DIR):
     backup_file = backup_dir / f"db_backup_{timestamp}.dump"
     logger.info(f"Attempting PostgreSQL backup to {backup_file}...")
     try:
-        pg_dump_cmd = ["pg_dump", "-Fc", "-v", "-d", db_url, "-f", str(backup_file)]
+        pg_dump_prefix, _ = _pg_client("pg_dump")
+        pg_dump_cmd = [*pg_dump_prefix, "-Fc", "-v", "-d", db_url]
         logger.info("Executing pg_dump command...")
-        # Use stderr=subprocess.PIPE for pg_dump's verbose output
-        result = subprocess.run(
-            pg_dump_cmd, check=True, capture_output=True, text=True, encoding="utf-8"
-        )
+        # Dump to stdout so the file is always owned by the current user, even
+        # when pg_dump runs inside a container.
+        with open(backup_file, "wb") as dump_file:
+            result = subprocess.run(
+                pg_dump_cmd,
+                check=True,
+                stdout=dump_file,
+                stderr=subprocess.PIPE,
+            )
+        backup_file.chmod(0o600)
         logger.info(f"✓ Backup created successfully: {backup_file}")
-        # Log pg_dump's verbose output (usually on stderr)
+        # pg_dump's verbose output goes to stderr
         if result.stderr:
-            logger.debug("pg_dump output:\n---\n%s\n---", result.stderr.strip())
-        # Also log stdout just in case
-        if result.stdout:
-            logger.debug("pg_dump stdout:\n---\n%s\n---", result.stdout.strip())
+            logger.debug("pg_dump output:\n---\n%s\n---", _decode(result.stderr).strip())
         return str(backup_file)
     except subprocess.CalledProcessError as e:
-        error_details = (
-            f"pg_dump Error:\nReturn Code: {e.returncode}\nStderr: {e.stderr}\nStdout: {e.stdout}"
-        )
+        error_details = f"pg_dump Error:\nReturn Code: {e.returncode}\nStderr: {_decode(e.stderr)}"
         logger.error(f"Backup FAILED.\n{error_details}")
+        # Never leave a truncated dump behind: it looks like a valid backup.
+        backup_file.unlink(missing_ok=True)
         send_notification("Backup FAILED", error_details)
         return None
-    except FileNotFoundError:
-        error_msg = "Error: 'pg_dump' command not found. Make sure PostgreSQL client tools are installed and in your PATH."
+    except FileNotFoundError as e:
+        error_msg = f"Error: {e}"
         logger.error(error_msg)
+        backup_file.unlink(missing_ok=True)
         send_notification("Backup FAILED", error_msg)
         return None
     except Exception as e:
         logger.exception("An unexpected error occurred during backup.")
+        backup_file.unlink(missing_ok=True)
         send_notification("Backup FAILED (Unexpected)", f"Error: {e}\nCheck logs.")
         return None
 
@@ -372,7 +463,7 @@ def create_backup(db_url, backup_dir=BACKUP_DB_DIR):
 # --- Restore Functions ---
 def restore_backup(db_url, backup_file):
     """Restore a PostgreSQL backup"""
-    backup_file_path = Path(backup_file)
+    backup_file_path = Path(backup_file).resolve()
     logger.info(f"Attempting to restore from backup: {backup_file_path}")
     if not backup_file_path.is_file():
         err_msg = f"Restore FAILED: Backup file not found at {backup_file}"
@@ -380,8 +471,12 @@ def restore_backup(db_url, backup_file):
         send_notification("Restore FAILED", err_msg)
         return False
     try:
+        # Mount the backup's directory read-only when pg_restore runs in Docker.
+        pg_restore_prefix, to_client_path = _pg_client(
+            "pg_restore", host_dir=backup_file_path.parent
+        )
         pg_restore_cmd = [
-            "pg_restore",
+            *pg_restore_prefix,
             "--clean",
             "--if-exists",
             "--no-owner",
@@ -389,7 +484,7 @@ def restore_backup(db_url, backup_file):
             "-v",
             "-d",
             db_url,
-            str(backup_file_path),
+            str(to_client_path(backup_file_path)),
         ]
         logger.info("Executing pg_restore command...")
         # pg_restore verbose output goes to stdout
@@ -411,8 +506,8 @@ def restore_backup(db_url, backup_file):
         logger.error(f"Restore FAILED.\n{error_details}")
         send_notification("Restore FAILED", error_details)
         return False
-    except FileNotFoundError:
-        error_msg = "Error: 'pg_restore' command not found. Make sure PostgreSQL client tools are installed and in your PATH."
+    except FileNotFoundError as e:
+        error_msg = f"Error: {e}"
         logger.error(error_msg)
         send_notification("Restore FAILED", error_msg)
         return False
@@ -432,7 +527,7 @@ def send_notification(subject, body):
     smtp_user = os.getenv("SMTP_USERNAME")
     smtp_pass = os.getenv("SMTP_PASSWORD")
 
-    if not all([sender, recipient, smtp_server, smtp_user, smtp_pass]):
+    if not (sender and recipient and smtp_server and smtp_user and smtp_pass):
         logger.warning("Email notification skipped: Missing required environment variables.")
         return
     try:
@@ -453,8 +548,10 @@ def send_notification(subject, body):
         logger.info("✓ Notification email sent successfully.")
     except smtplib.SMTPAuthenticationError:
         logger.error("Failed to send email: SMTP Authentication failed. Check credentials.")
-    except Exception:
-        logger.exception("Failed to send email due to an unexpected error.")
+    except Exception as e:
+        # Log without exc_info: this runs inside another handler, so a traceback
+        # would drag in the unrelated failure that triggered the notification.
+        logger.error("Failed to send email: %s", e)
 
 
 # --- Main Function ---
@@ -516,7 +613,7 @@ def main():
             logger.error(
                 "Backup action requires a database URL. Use --db-url or set DB_URL in .env."
             )
-            return
+            return 1
 
         backup_file_path = create_backup(db_url, local_backup_dir)
 
@@ -528,7 +625,9 @@ def main():
 
             if args.upload_method == "rclone":
                 # --- Rclone Upload ---
-                rclone_remote_name = args.rclone_remote or os.getenv("RCLONE_REMOTE_NAME")
+                rclone_remote_name = normalize_rclone_remote(
+                    args.rclone_remote or os.getenv("RCLONE_REMOTE_NAME")
+                )
                 if not rclone_remote_name:
                     logger.error(
                         "rclone upload requested but no remote name provided. Use --rclone-remote or set RCLONE_REMOTE_NAME in .env."
@@ -599,6 +698,7 @@ def main():
                     f"Backup Successful (Upload FAILED/Skipped - {args.upload_method})",
                     f"Backup created locally: {os.path.basename(backup_file_path)}\nUpload via {args.upload_method} did not complete successfully.",
                 )
+                return 1
 
         elif backup_file_path:
             logger.info("Backup created locally, upload not requested.")
@@ -606,6 +706,7 @@ def main():
             # send_notification("Backup Successful (Local Only)", f"Backup created: {os.path.basename(backup_file_path)}")
         else:
             logger.error("Backup creation failed. See previous logs.")
+            return 1
 
     # --- Action: restore ---
     elif args.action == "restore":
@@ -614,7 +715,7 @@ def main():
             logger.error(
                 "Restore action requires a destination database URL. Use --db-url or set DB_URL."
             )
-            return
+            return 1
 
         target_backup_path = None  # Full path to the final backup file to restore
 
@@ -632,7 +733,7 @@ def main():
                     "Restore Failed",
                     f"Specified backup file not found: {target_backup_path}",
                 )
-                return
+                return 1
         else:
             # No specific file given, check local first
             logger.info(
@@ -676,7 +777,9 @@ def main():
                     logger.info(f"No suitable local backup found in '{local_backup_dir}'.")
 
                 # Check if rclone remote is configured for potential download
-                rclone_remote_name = args.rclone_remote or os.getenv("RCLONE_REMOTE_NAME")
+                rclone_remote_name = normalize_rclone_remote(
+                    args.rclone_remote or os.getenv("RCLONE_REMOTE_NAME")
+                )
                 if not rclone_remote_name:
                     logger.info("No rclone remote configured, cannot check for remote backups.")
                 else:
@@ -702,27 +805,28 @@ def main():
                                 logger.error(
                                     "Failed to find or download latest backup from rclone remote."
                                 )
-                                return  # Exit if download failed
+                                return 1  # Exit if download failed
                         else:
                             logger.info("Remote download cancelled by user.")
                             # Exit if user cancelled remote check and local wasn't chosen
                             if not target_backup_path:
-                                return
+                                return 1
 
                     except EOFError:
                         logger.warning(
                             "Cannot confirm remote download in non-interactive mode. Aborting."
                         )
-                        return
+                        return 1
 
         # Proceed with restore if a target file was determined
         if target_backup_path:
             logger.info(
                 f"Proceeding to restore {Path(target_backup_path).name} to database specified by --db-url."
             )
-            restore_backup(db_url, target_backup_path)
+            return 0 if restore_backup(db_url, target_backup_path) else 1
         else:
             logger.error("No backup file selected, found, or downloaded for restore.")
+            return 1
 
     # --- Action: list ---
     elif args.action == "list":
@@ -737,7 +841,7 @@ def main():
                 print(f"\nNo .dump backups found locally in '{local_backup_dir}'.")
                 logger.info(f"No .dump backups found locally in '{local_backup_dir}'.")
                 # Optionally add listing from rclone remote here if needed
-                return
+                return 0
 
             print(f"\nAvailable local backups in '{local_backup_dir}':")
             list_output = []
@@ -758,14 +862,16 @@ def main():
                 f"Backup directory '{local_backup_dir}' does not exist or is not a directory."
             )
             print(f"\nError: Backup directory '{local_backup_dir}' not found.")
+            return 1
 
     logger.info(f"Backup tool action '{args.action}' finished.")
+    return 0
 
 
 # --- Entry Point ---
 if __name__ == "__main__":
     try:
-        main()
+        sys.exit(main())
     except KeyboardInterrupt:
         print("\nCancelled.")
         sys.exit(130)

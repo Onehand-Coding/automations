@@ -28,6 +28,22 @@ def test_run_script_missing_script_exits_with_error() -> None:
     assert exc_info.value.exit_code == 1
 
 
+def test_run_script_propagates_child_exit_code(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(subprocess, "call", lambda _command: 3)
+    with pytest.raises(typer.Exit) as exc_info:
+        _run_script("pg_backup_tool.py")
+    assert exc_info.value.exit_code == 3
+
+
+def test_run_script_maps_signal_death_to_shell_exit_code(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(subprocess, "call", lambda _command: -2)
+    with pytest.raises(typer.Exit) as exc_info:
+        _run_script("pg_backup_tool.py")
+    assert exc_info.value.exit_code == 130
+
+
 def test_is_playlist_url_returns_false_when_ytdlp_is_unavailable(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -57,9 +57,12 @@ def _run_script(script_name: str, args: Optional[list[str]] = None, use_sudo: bo
     # typer.echo(f"▶️  Running: {' '.join(command)}")  # This is noise
     # We use .call here instead of .run to allow the script to be interactive (e.g., for password prompts)
     try:
-        subprocess.call(command)
+        returncode = subprocess.call(command)
     except KeyboardInterrupt:
         raise typer.Exit(130) from None
+    if returncode:
+        # Signal deaths come back negative; map them to shell conventions (128 + signal).
+        raise typer.Exit(128 - returncode if returncode < 0 else returncode)
 
 
 # --- CLI Commands ---
